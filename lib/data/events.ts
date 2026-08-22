@@ -1,28 +1,65 @@
-import { MOCK_EVENTS } from "@/lib/mockData";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { CalendarEvent } from "@/lib/types";
+import type { EventRow } from "@/lib/data/dbTypes";
 
-/** Phase 1: backed by in-memory mock data. Swaps to a Supabase query in Phase 3. */
+function mapEvent(row: EventRow): CalendarEvent {
+  return {
+    id: row.id,
+    title: row.title,
+    familyMemberId: row.family_member_id,
+    category: row.category ?? undefined,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at ?? undefined,
+    allDay: row.all_day,
+    location: row.location ?? undefined,
+    notes: row.notes ?? undefined,
+    status: row.status,
+    sourceType: row.source_type,
+    sourceDetail: row.source_detail ?? undefined,
+  };
+}
 
 export async function getEventsInRange(
   start: Date,
   end: Date,
   personId?: string | null
 ): Promise<CalendarEvent[]> {
-  return MOCK_EVENTS.filter((event) => {
-    const startsAt = new Date(event.startsAt);
-    if (startsAt < start || startsAt >= end) return false;
-    if (personId && personId !== "all" && event.familyMemberId !== personId) return false;
-    return true;
-  }).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const supabase = getSupabaseClient();
+  let query = supabase
+    .from("events")
+    .select("*")
+    .gte("starts_at", start.toISOString())
+    .lt("starts_at", end.toISOString())
+    .order("starts_at");
+  if (personId && personId !== "all") {
+    query = query.eq("family_member_id", personId);
+  }
+  const { data, error } = await query.returns<EventRow[]>();
+  if (error) throw error;
+  return data.map(mapEvent);
 }
 
 export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]> {
-  const now = new Date();
-  return MOCK_EVENTS.filter((event) => new Date(event.startsAt) >= now)
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-    .slice(0, limit);
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .gte("starts_at", new Date().toISOString())
+    .order("starts_at")
+    .limit(limit)
+    .returns<EventRow[]>();
+  if (error) throw error;
+  return data.map(mapEvent);
 }
 
 export async function getPendingReviewEvents(): Promise<CalendarEvent[]> {
-  return MOCK_EVENTS.filter((event) => event.status === "pending_review");
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("status", "pending_review")
+    .order("starts_at")
+    .returns<EventRow[]>();
+  if (error) throw error;
+  return data.map(mapEvent);
 }

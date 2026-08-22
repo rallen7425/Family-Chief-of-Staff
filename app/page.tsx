@@ -7,6 +7,8 @@ import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
 import { NeedsDoingCard } from "@/components/today/NeedsDoingCard";
 
+export const dynamic = "force-dynamic";
+
 export default async function TodayPage() {
   const [keepInMind, pendingReview, upcomingEvents, todos, familyMembers] = await Promise.all([
     getActiveKeepInMindItems(),

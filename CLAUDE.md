@@ -102,6 +102,22 @@ driven by `?view=&date=&person=` search params, person filter, date nav) and Tod
 the mockup. No Supabase/auth/mutations yet — everything here is read-only against
 `lib/mockData.ts`.
 
-Next: **Phase 2 — Supabase infra** (push the `rufus` schema migration in
-`rocky-coast-labs`, wire `lib/supabase.ts`, seed real family members, swap `lib/data/*.ts`
-internals from mock arrays to Supabase queries).
+**Phase 2 — Supabase infra.** Done: `rufus` schema migration pushed to the shared
+project (`rocky-coast-labs/supabase/migrations/20260822000001_rufus_schema.sql` —
+tables, RLS enabled with zero anon/authenticated policies, service_role-only grants,
+family roster seeded directly in the migration), `rufus` added to `config.toml`'s
+exposed API schemas, `_meta.apps` row added. Verified: schema is exposed via PostgREST
+but anon access is correctly denied (permission error), and `lib/supabase.ts`'s
+service-role client reads the seeded roster successfully.
+
+**Phase 3 — Wire real data.** Done alongside Phase 2 rather than as a separate step:
+`lib/data/*.ts` internals swapped from `lib/mockData.ts` (deleted, no longer
+referenced) to real Supabase queries via `lib/data/dbTypes.ts` row types. `app/page.tsx`
+marked `force-dynamic` (it would otherwise have been statically prerendered at build
+time with stale data baked in, since Server Components can call Supabase directly).
+Verified in-browser against the live (currently empty except family_members) database —
+all three Today cards and Schedule/Todo show correct empty states, person filter pulls
+the real roster.
+
+Next: **Phase 4 — Manual CRUD** (add/edit dialogs + Server Actions for events/todos,
+todo toggle, `EventReviewDialog` for `pending_review` rows).

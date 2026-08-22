@@ -1,7 +1,25 @@
-import { MOCK_KEEP_IN_MIND } from "@/lib/mockData";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { KeepInMindItem } from "@/lib/types";
+import type { KeepInMindRow } from "@/lib/data/dbTypes";
 
-/** Phase 1: backed by in-memory mock data. Swaps to a Supabase query in Phase 3. */
+function mapKeepInMindItem(row: KeepInMindRow): KeepInMindItem {
+  return {
+    id: row.id,
+    body: row.body,
+    icon: (row.icon as KeepInMindItem["icon"]) ?? "reminder",
+    familyMemberId: row.family_member_id,
+    dismissed: row.dismissed,
+  };
+}
+
 export async function getActiveKeepInMindItems(): Promise<KeepInMindItem[]> {
-  return MOCK_KEEP_IN_MIND.filter((item) => !item.dismissed);
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("keep_in_mind_items")
+    .select("*")
+    .eq("dismissed", false)
+    .order("created_at")
+    .returns<KeepInMindRow[]>();
+  if (error) throw error;
+  return data.map(mapKeepInMindItem);
 }
