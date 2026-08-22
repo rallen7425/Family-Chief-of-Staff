@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { getActiveKeepInMindItems } from "@/lib/data/keepInMind";
 import { getPendingReviewEvents, getUpcomingEvents } from "@/lib/data/events";
-import { getIncompleteTodos } from "@/lib/data/todos";
+import { getIncompleteTodos, getUrgentTodos, getPendingReviewTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
@@ -10,13 +10,16 @@ import { NeedsDoingCard } from "@/components/today/NeedsDoingCard";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [keepInMind, pendingReview, upcomingEvents, todos, familyMembers] = await Promise.all([
-    getActiveKeepInMindItems(),
-    getPendingReviewEvents(),
-    getUpcomingEvents(3),
-    getIncompleteTodos(3),
-    getFamilyMembers(),
-  ]);
+  const [keepInMind, urgentTodos, pendingReviewEvents, pendingReviewTodos, upcomingEvents, todos, familyMembers] =
+    await Promise.all([
+      getActiveKeepInMindItems(),
+      getUrgentTodos(),
+      getPendingReviewEvents(),
+      getPendingReviewTodos(),
+      getUpcomingEvents(3),
+      getIncompleteTodos(3),
+      getFamilyMembers(),
+    ]);
 
   return (
     <>
@@ -28,8 +31,8 @@ export default async function TodayPage() {
       </div>
       <KeepInMindCard
         items={keepInMind}
-        pendingReviewEvents={pendingReview}
-        familyMembers={familyMembers}
+        urgentTodos={urgentTodos}
+        pendingReviewCount={pendingReviewEvents.length + pendingReviewTodos.length}
       />
       <ScheduleCard events={upcomingEvents} familyMembers={familyMembers} />
       <NeedsDoingCard todos={todos} familyMembers={familyMembers} />

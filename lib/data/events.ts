@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { CalendarEvent } from "@/lib/types";
 import type { EventRow } from "@/lib/data/dbTypes";
@@ -52,7 +53,9 @@ export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]>
   return data.map(mapEvent);
 }
 
-export async function getPendingReviewEvents(): Promise<CalendarEvent[]> {
+/** Wrapped in cache() since the root layout (notification badge) and the
+ * Today page (approval summary line) both need this within one request. */
+export const getPendingReviewEvents = cache(async (): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("events")
@@ -62,4 +65,4 @@ export async function getPendingReviewEvents(): Promise<CalendarEvent[]> {
     .returns<EventRow[]>();
   if (error) throw error;
   return data.map(mapEvent);
-}
+});

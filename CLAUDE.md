@@ -282,12 +282,45 @@ cron now runs unattended.
 
 **All 8 phases of the original implementation plan are now complete.**
 
+## Post-MVP: Keep in Mind redesign + review/approval flow
+
+Real usage surfaced the exact problem flagged as a "known follow-up" above — with 23
+real email-scan items, the old design (every `pending_review` event listed inline in
+Keep in Mind, each opening its own confirm dialog) was unusable. Redesigned per user
+feedback:
+
+- **Keep in Mind is now for things needing action *right now*** — system
+  `keep_in_mind_items` + todos due today/overdue (`lib/data/todos.ts` →
+  `getUrgentTodos()`, regardless of source/review-status, since the real-world action a
+  todo represents doesn't wait on it being formally reviewed) — capped at 3 with a
+  "View all" link to `/todo`. It no longer lists individual auto-detected *events* at
+  all; those move to:
+- **A single summary line** — "N new entries need approval →", linking to a new
+  **`/review`** page — plus a **red dot on the header's bell icon** (now a link to
+  `/review`) whenever the count is nonzero. Both draw from the same
+  `getPendingReviewEvents()` + `getPendingReviewTodos()` (events.ts/todos.ts, both
+  wrapped in React's `cache()` since the root layout, Today page, and `/review` all need
+  them within one request).
+- **`/review`** groups pending events+todos by source email (`source_detail.
+  gmailMessageId`, via `components/review/ReviewList.tsx`), each item checkbox-selected
+  by default. Per-group "Approve (N)" approves only the checked items in that group;
+  per-item "X" removes one item immediately regardless of checkbox state; a top-level
+  "Approve All" approves literally everything regardless of selection. New
+  `lib/actions/review.ts` (`approveReviewItems`/`removeReviewItems`, bulk `.in(...)`
+  updates keyed by `{id, kind}` pairs so one action handles mixed events+todos).
+  Deleted the now-unused `EventReviewDialog`/`PendingReviewNudge` (the old
+  per-item modal this replaced).
+
+Also fixed during this pass: `query_schedule`'s chat tool had a literal keyword
+substring filter that missed synonyms — asking "when is Ben's next game" against a
+real "Scrimmage vs. Andover" event returned nothing, because "game" isn't a substring of
+"Scrimmage". Removed the filter entirely; the tool now always returns the full
+date-ranged result set and the system prompt explicitly tells Claude to reason over the
+actual titles itself (a household's event volume is small enough that this costs
+nothing, and it's far more reliable than string matching).
+
 ## Known follow-ups (not yet scheduled)
 
-- Today screen's "Keep in Mind" review list has no cap — with real email-scan volume
-  (23 items on first real run) it scrolls a long way. Deferred per the user — revisit
-  once day-to-day use makes clear what layout actually helps (cap + "review all" link,
-  vs. a dedicated review screen).
 - Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per
   the original plan's explicit MVP scope cut).
 - "Message" tab is still just a placeholder (future family-to-family messaging).

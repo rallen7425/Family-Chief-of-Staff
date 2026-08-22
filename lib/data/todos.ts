@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
+import { format } from "date-fns";
 import type { Todo } from "@/lib/types";
 import type { TodoRow } from "@/lib/data/dbTypes";
 
@@ -38,3 +40,35 @@ export async function getIncompleteTodos(limit: number): Promise<Todo[]> {
   if (error) throw error;
   return data.map(mapTodo);
 }
+
+/** Todos due today or already overdue, not yet completed — regardless of
+ * review status, since the real-world action they represent (bring a water
+ * bottle, sign a form) doesn't wait on the item being formally reviewed.
+ * Not limited to any one source, but excludes dismissed items. */
+export const getUrgentTodos = cache(async (): Promise<Todo[]> => {
+  const supabase = getSupabaseClient();
+  const today = format(new Date(), "yyyy-MM-dd");
+  const { data, error } = await supabase
+    .from("todos")
+    .select("*")
+    .eq("completed", false)
+    .neq("status", "dismissed")
+    .not("due_date", "is", null)
+    .lte("due_date", today)
+    .order("due_date")
+    .returns<TodoRow[]>();
+  if (error) throw error;
+  return data.map(mapTodo);
+});
+
+export const getPendingReviewTodos = cache(async (): Promise<Todo[]> => {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("todos")
+    .select("*")
+    .eq("status", "pending_review")
+    .order("created_at")
+    .returns<TodoRow[]>();
+  if (error) throw error;
+  return data.map(mapTodo);
+});

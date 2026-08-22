@@ -10,17 +10,13 @@ export const CHAT_TOOLS: Anthropic.Tool[] = [
   {
     name: "query_schedule",
     description:
-      "Search the family's events and todos. Call this whenever the user asks about upcoming events, todos, or a question like 'when is X' or 'what does Y have going on'. Returns matches including where the information originally came from, so you can cite it in your answer.",
+      "Search the family's events and todos. Call this whenever the user asks about upcoming events, todos, or a question like 'when is X' or 'what does Y have going on'. Returns every matching item's title as-written (no keyword filter) — use your own judgment on the titles to answer category-style questions (e.g. a 'Scrimmage' or 'Practice' both count as a 'game'/'sports' question; don't expect an exact word match). Returns matches including where the information originally came from, so you can cite it in your answer.",
     input_schema: {
       type: "object",
       properties: {
         person_name: {
           type: "string",
           description: "Filter to one family member by first name, e.g. 'Ben'. Omit to search everyone.",
-        },
-        keyword: {
-          type: "string",
-          description: "Filter by a keyword in the title, e.g. 'soccer'. Omit to skip keyword filtering.",
         },
         start_date: {
           type: "string",
@@ -95,7 +91,6 @@ function describeSource(sourceType: SourceType, detail?: SourceDetail): string |
 
 interface QueryScheduleInput {
   person_name?: string;
-  keyword?: string;
   start_date?: string;
   end_date?: string;
   include_todos?: boolean;
@@ -107,15 +102,18 @@ export async function executeQuerySchedule(rawInput: unknown, familyMembers: Fam
   const end = input.end_date ? addDays(startOfDay(parseDateParam(input.end_date)), 1) : addDays(start, 90);
   const person = resolveFamilyMember(input.person_name, familyMembers);
   const personId = person?.id ?? "all";
-  const keyword = input.keyword?.toLowerCase();
 
-  let events = await getEventsInRange(start, end, personId);
-  if (keyword) events = events.filter((event) => event.title.toLowerCase().includes(keyword));
+  // No keyword pre-filter: a literal substring match on the title (e.g.
+  // "game") misses semantically-related titles like "Scrimmage" or
+  // "Practice" that never contain that word. Returning the full set and
+  // letting Claude reason over the actual titles is far more reliable than
+  // a naive string match, and a household's event volume is small enough
+  // that this costs nothing.
+  const events = await getEventsInRange(start, end, personId);
 
   let todos: Awaited<ReturnType<typeof getTodos>> = [];
   if (input.include_todos !== false) {
     todos = await getTodos(personId);
-    if (keyword) todos = todos.filter((todo) => todo.title.toLowerCase().includes(keyword));
   }
 
   return {
