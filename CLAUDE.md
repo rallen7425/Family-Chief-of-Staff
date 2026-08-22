@@ -89,9 +89,19 @@ held in a blocking queue — and surfaced as a review nudge on the Today screen.
 
 ## Current build phase
 
-**Phase 0 — Scaffolding & tokens.** Done: `create-next-app`, design docs moved into
-`docs/design/`, Tailwind v4 tokens, fonts, layout shell (header + tab row + inert chat
-bar), empty route shells for `/`, `/schedule`, `/todo`; `/message` built to its final
-placeholder form since that's in scope for the whole MVP. No Supabase/data wiring yet.
+**Phase 0 — Scaffolding & tokens.** Done.
 
-Next: **Phase 1 — Static UI, dummy data.**
+**Phase 1 — Static UI, dummy data.** Done: `lib/types.ts` (mirrors the planned `rufus`
+schema), `lib/mockData.ts` (seeded with the real family roster), and `lib/data/*.ts`
+(`events.ts`, `todos.ts`, `keepInMind.ts`, `familyMembers.ts`) — built one phase early as
+async functions backed by mock data so Phase 3 only has to swap internals, not call
+sites. Today dashboard (Keep in Mind incl. `pending_review` nudges, Schedule preview,
+Needs Doing preview) and Schedule (`/schedule`, all 4 view modes — Day/3-Day/Week/Month —
+driven by `?view=&date=&person=` search params, person filter, date nav) and Todo
+(`/todo`, person filter, review-status badge) all built and verified in-browser against
+the mockup. No Supabase/auth/mutations yet — everything here is read-only against
+`lib/mockData.ts`.
+
+Next: **Phase 2 — Supabase infra** (push the `rufus` schema migration in
+`rocky-coast-labs`, wire `lib/supabase.ts`, seed real family members, swap `lib/data/*.ts`
+internals from mock arrays to Supabase queries).
