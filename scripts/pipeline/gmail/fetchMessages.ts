@@ -82,7 +82,19 @@ export async function fetchMessageDetail(gmail: gmail_v1.Gmail, id: string): Pro
   const state: WalkState = { plainText: null, htmlText: null, attachments: [] };
   if (message.payload) walkParts(message.payload, state);
 
-  const bodyText = state.plainText ?? (state.htmlText ? stripHtml(state.htmlText) : "");
+  // Some senders (Veracross, SJP's mailer) attach a near-empty text/plain
+  // part — a blank string or just an HTML comment placeholder — alongside
+  // the real content in text/html. Preferring "plainText exists" over
+  // "plainText has anything in it" silently discarded the actual email
+  // body for those senders. Fall back to the HTML part whenever the plain
+  // part isn't actually meaningful text.
+  const meaningfulPlainText = state.plainText?.replace(/<!--[\s\S]*?-->/g, "").trim() ?? "";
+  const bodyText =
+    meaningfulPlainText.length > 10
+      ? meaningfulPlainText
+      : state.htmlText
+        ? stripHtml(state.htmlText)
+        : meaningfulPlainText;
 
   return {
     id: message.id!,

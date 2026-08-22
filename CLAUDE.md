@@ -375,8 +375,127 @@ correctly produced 4 todos, while every newsletter/administrative email in the b
 nothing — the marketing-content exclusion from Phase 7 is generalizing well beyond just
 spam.
 
+## Body-extraction bug: empty text/plain parts hid real content
+
+The user asked chat about a Grandparents' Day email from Nora's school (Austin Prep)
+and got nothing — the email had genuinely been scanned (correctly, per
+`email_scan_log`), but extracted 0 events/todos. Root cause in
+`scripts/pipeline/gmail/fetchMessages.ts`: some senders (Austin Prep's mailer,
+`veracross.com`) attach a near-empty `text/plain` MIME part — literally a blank string
+or an `<!--placeholder-->` HTML comment — alongside the real content in `text/html`. The
+body-selection logic only checked "does a plain-text part exist", not "does it contain
+anything," so it always won over the actual HTML body, silently discarding the real
+email content before it ever reached Claude.
+
+Fixed by only trusting the plain-text part when it has more than a few characters after
+stripping HTML comments, falling back to the (already-existing) HTML-stripping path
+otherwise. Verified the fix directly against the real email — before: empty body; after:
+the actual text, correctly extracting the real event (Grandparents' Day, Oct 6–7) and a
+todo (submit contact info by Aug 28).
+
+This bug predates the fix, so already-scanned emails from the same sender pattern
+needed reprocessing — dedupe means a fixed pipeline doesn't retroactively reprocess
+anything on its own. Deleted the affected `email_scan_log` rows and reprocessed 14
+emails from `veracross.com` specifically (not all 37 zero-result scans — most of those
+are genuinely irrelevant marketing/newsletters that correctly extracted nothing; only
+the same-sender-pattern ones were suspects for this exact bug). Recovered real events
+and todos that had been silently dropped since the original Phase 7 backfill.
+
+**Backfill/reprocessing pattern, for future reference:** the standing pipeline's dedupe
+(`email_scan_log`) means fixing an extraction bug never retroactively repairs old scans.
+When that happens, the fix is: delete the affected `gmail_message_id` rows from
+`email_scan_log`, then reprocess just those IDs by reusing the pipeline's internals
+(`fetchMessageDetail`, `extractItemsFromMessage`, `writeExtractedItems`, etc. — see the
+pattern in this session's now-deleted `scripts/reprocess-veracross.ts`) rather than
+widening the standing cron's search window, which stays `newer_than:2d` for ongoing
+automatic scans.
+
+## Systemic timezone bug: server-rendered times were UTC, not household-local
+
+The user reported "Football practice" showing 8:00 PM when the source email clearly
+said 4:00 PM. The stored data was actually correct (`20:00 UTC` = 4:00 PM Eastern) —
+the bug was in **display**: every server-rendered date/time in the app (`format(new
+Date(startsAt), ...)` in Server Components — Schedule, Today, Todo, Review,
+Notifications, and the chat tool's `query_schedule`) relies on date-fns reading the
+Node process's ambient local timezone. That's correct on this dev machine only because
+the Mac's system timezone happens to be America/New_York — on Vercel, which defaults to
+UTC, the exact same code would render every time 4-5 hours ahead of the household's
+actual local time. This had been silently masked through every phase of local testing.
+
+Tried the obvious fix first — setting `TZ=America/New_York` as a Vercel environment
+variable — and hit a wall: **`TZ` is a Vercel-reserved name**, rejected by both the
+dashboard and `vercel env add`. Fixed instead with `instrumentation.ts` (new, repo
+root) — Next.js's documented `register()` hook, which runs once at server boot in every
+environment (local dev, preview, production) — setting `process.env.TZ =
+"America/New_York"` in code rather than depending on infra config that could be missing
+or silently drift on a fresh deploy.
+
+**Verified the fix actually overrides a hostile ambient environment**, not just that it
+works when the ambient timezone already happened to be correct: ran `TZ=UTC npm run dev`
+(forcing the exact failure mode Vercel would hit) and confirmed the Schedule page,
+Today page, and the chat's `query_schedule` tool all still correctly showed 4:00 PM, not
+8:00 PM, with `instrumentation.ts` in place.
+
+## Today screen: day-less time labels made tomorrow look like today
+
+Related but distinct report: retreat events correctly dated for Sunday were "added for
+today (Saturday)" — not a data or display-formatting bug this time, but a missing-context
+one. The Today screen's "Schedule" card shows the next few *upcoming* events (per
+MVP-Spec.md), not strictly today's — on a day with nothing scheduled, the next events
+shown are tomorrow's, but with only a time label ("8:00am") and no day indicator, that
+reads as "happening today." Fixed in `ScheduleCard.tsx`: each row now shows a small day
+label above the time — nothing when the event actually is today (unambiguous), else
+"Tomorrow" or the weekday name.
+
+Also fixed in the same pass: the Leader Training/retreat events had `family_member_id:
+null` because the source email never explicitly names Ben (it's addressed to retreat
+leaders generally) — extraction correctly left `person_hint` null rather than guessing,
+but the resulting neutral-gray color bar read as a display bug to the user, who knows
+from context it's specifically his activity. Reassigned those 6 events to Ben directly
+(one-off data fix, not an extraction change — there was no way to know it was Ben from
+the email text alone). This is also the first time it's become clear there's no way to
+*edit* an already-confirmed event's details through the UI — worth a real feature at
+some point, not built now.
+
+## Data-quality fixes from real-content reprocessing
+
+Reprocessing the Austin Prep (`veracross.com`) emails after the body-extraction fix
+surfaced two more real issues, both fixed directly in the data (not code bugs — the
+underlying extraction is working correctly per-email, these are cross-email
+consequences):
+- **Wrong year**: one event ("campus closed to guests... through Aug 5") was extracted
+  with year 2020 — a real instance of the *exact* bug the received-date anchor above
+  fixes, from before that fix existed. Corrected to 2026 directly (the anchor fix
+  prevents this going forward).
+- **Cross-email duplicates**: Austin Prep sent both an original "Grandparents' Day"
+  email and a "Reminder" follow-up days later, each independently and correctly
+  extracting the same real event/todo — since extraction is scoped to one email at a
+  time, there was no way to know within a single pass. Deduped by matching on
+  date/time rather than title (the two emails phrased the title slightly differently).
+  This class of duplicate (same real-world event mentioned in an original + reminder
+  email) doesn't have a code fix within the current per-message extraction design —
+  worth revisiting if it recurs often enough to matter.
+
+## Mobile keyboard covering the chat input
+
+Reported: opening the chat panel and tapping the input, the on-screen keyboard covered
+it. Classic mobile-web cause — the panel's height was `calc(100vh - 4rem)`, and `100vh`
+is the *layout* viewport, which doesn't shrink when the keyboard opens; the input,
+pinned to the bottom of that now-too-tall container, ends up rendered underneath the
+keyboard rather than above it. Fixed by switching to `100dvh` (dynamic viewport height)
+in `ChatPanel.tsx`, which is designed for exactly this and updates live as the visual
+viewport changes. Couldn't verify live keyboard behavior directly (headless browser
+tooling has no real on-screen keyboard to trigger the resize) — this is the documented,
+standard fix for the failure mode described, but worth the user confirming it feels
+right on an actual phone.
+
 ## Known follow-ups (not yet scheduled)
 
 - Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per
   the original plan's explicit MVP scope cut).
 - "Message" tab is still just a placeholder (future family-to-family messaging).
+- No way to edit an already-confirmed event/todo's details through the UI (surfaced
+  when the Leader Training events needed a manual person reassignment) — only
+  create-new and the pending-review approve/edit/remove flow exist today.
+- Cross-email duplicate detection (an original + a "reminder" email describing the same
+  real event) isn't handled within the current per-message extraction design.

@@ -71,6 +71,7 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
           sender: message.sender,
           bodyText: message.bodyText,
           attachments,
+          receivedAt: message.receivedAt,
         },
         familyMembers
       );

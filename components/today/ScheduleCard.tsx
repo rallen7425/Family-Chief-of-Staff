@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Filter } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday, isTomorrow } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
 
@@ -33,10 +33,20 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
       <div className="flex flex-col gap-6">
         {events.map((event) => {
           const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
+          const startDate = new Date(event.startsAt);
+          // This preview shows the next few *upcoming* events, not strictly
+          // "today's" — without a day label, an event on a day with nothing
+          // scheduled today reads as if it's happening today.
+          const dayLabel = isToday(startDate) ? null : isTomorrow(startDate) ? "Tomorrow" : format(startDate, "EEE");
           return (
             <div key={event.id} className="flex gap-4 items-start relative">
-              <div className="w-12 text-[13px] text-muted-label font-medium pt-1 shrink-0 text-right">
-                {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+              <div className="w-14 shrink-0 text-right leading-tight pt-1">
+                {dayLabel && (
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-primary">{dayLabel}</div>
+                )}
+                <div className="text-[13px] text-muted-label font-medium">
+                  {event.allDay ? "All day" : format(startDate, "h:mma").toLowerCase()}
+                </div>
               </div>
               <div
                 className={`w-[3px] self-stretch rounded-full mt-1 ${

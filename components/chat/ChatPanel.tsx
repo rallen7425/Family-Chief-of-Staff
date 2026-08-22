@@ -44,7 +44,7 @@ export function ChatPanel({ familyMembers }: ChatPanelProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Chat with Rufus"
-        className="relative bg-mist w-full max-w-[430px] mx-auto flex flex-col mt-16 h-[calc(100vh-4rem)] rounded-t-card shadow-[0_-8px_30px_rgba(0,0,0,0.15)]"
+        className="relative bg-mist w-full max-w-[430px] mx-auto flex flex-col mt-16 h-[calc(100dvh-4rem)] rounded-t-card shadow-[0_-8px_30px_rgba(0,0,0,0.15)]"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <h2 className="font-display font-semibold text-[18px] text-ink">Chat with Rufus</h2>

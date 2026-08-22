@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { format } from "date-fns";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { FamilyMember } from "@/lib/types";
 
@@ -44,10 +45,18 @@ export interface MessageContent {
   sender: string;
   bodyText: string;
   attachments: MessageAttachmentContent[];
+  /** ISO datetime the email was received — the only anchor available for
+   * resolving year-ambiguous or relative dates in the email's own text
+   * (e.g. "through August 5" with no year, or "next Tuesday"). Without
+   * this, the model has no grounding and can invent an arbitrary year. */
+  receivedAt: string | null;
 }
 
 function buildPrompt(message: MessageContent): string {
-  let content = `=== EMAIL ===\nFrom: ${message.sender}\nSubject: ${message.subject}\n\n${
+  const receivedLabel = message.receivedAt
+    ? format(new Date(message.receivedAt), "EEEE, MMMM d, yyyy")
+    : "unknown";
+  let content = `=== EMAIL ===\nReceived: ${receivedLabel}\nFrom: ${message.sender}\nSubject: ${message.subject}\n\n${
     message.bodyText.trim() || "(empty body)"
   }\n`;
 
@@ -77,7 +86,7 @@ export async function extractItemsFromMessage(
 
 First, decide if this email is personal to the family — school, sports/activities, medical, a friend or relative, a service the family actually uses (e.g. a photo order, a permission slip). If it's marketing, a cold sales pitch, a newsletter, a promotional "offer expires" / "sale ends" message, or bulk/automated mail unrelated to the family's real life, extract nothing and return an empty items array — a countdown on a sales offer is not a family todo, even though it has a date.
 
-Only extract items with a concrete, determinable date — a game, appointment, deadline, permission-slip due date, etc. Skip vague mentions with no date. Resolve relative dates ("next Friday", "the 15th") using the email's own date context if possible; otherwise leave date null.
+Only extract items with a concrete, determinable date — a game, appointment, deadline, permission-slip due date, etc. Skip vague mentions with no date. The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text in the email. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
 
 If a roster member's name is mentioned or clearly implied, set person_hint to their exact name; otherwise null (whole family). For every item, quote the exact source_excerpt that justifies it, and record whether it came from the email body or a specific attachment (and page, for PDFs) so a person can verify where the information came from.`,
     messages: [{ role: "user", content: buildPrompt(message) }],
