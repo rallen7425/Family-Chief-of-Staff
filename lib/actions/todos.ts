@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { SourceDetail } from "@/lib/types";
 
 export interface TodoInput {
   title: string;
@@ -25,6 +26,30 @@ export async function createTodo(input: TodoInput): Promise<{ error?: string }> 
     due_date: input.dueDate || null,
     status: "confirmed",
     source_type: "manual",
+  });
+  if (error) return { error: error.message };
+
+  revalidateTodoViews();
+  return {};
+}
+
+/** Chat-originated todos keep the original message as provenance, per the
+ * three-source-type convention (manual/chat/email_scan) — see TodoInput. */
+export async function createTodoFromChat(
+  input: TodoInput,
+  sourceDetail: SourceDetail
+): Promise<{ error?: string }> {
+  const title = input.title.trim();
+  if (!title) return { error: "Title is required." };
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("todos").insert({
+    title,
+    family_member_id: input.familyMemberId,
+    due_date: input.dueDate || null,
+    status: "confirmed",
+    source_type: "chat",
+    source_detail: sourceDetail,
   });
   if (error) return { error: error.message };
 

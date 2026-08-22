@@ -5,18 +5,32 @@ import type { FamilyMember } from "@/lib/types";
 import type { TodoInput } from "@/lib/actions/todos";
 import { FORM_INPUT_CLASS, FORM_LABEL_CLASS } from "@/components/shared/formStyles";
 
+export interface TodoFormInitialValues {
+  title: string;
+  familyMemberId: string;
+  dueDate: string; // YYYY-MM-DD
+}
+
 interface TodoFormProps {
   familyMembers: FamilyMember[];
+  initialValues?: TodoFormInitialValues;
   submitLabel: string;
   onSubmit: (input: TodoInput) => Promise<{ error?: string }>;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export function TodoForm({ familyMembers, submitLabel, onSubmit, onSuccess, onCancel }: TodoFormProps) {
-  const [title, setTitle] = useState("");
-  const [familyMemberId, setFamilyMemberId] = useState("");
-  const [dueDate, setDueDate] = useState("");
+export function TodoForm({
+  familyMembers,
+  initialValues,
+  submitLabel,
+  onSubmit,
+  onSuccess,
+  onCancel,
+}: TodoFormProps) {
+  const [title, setTitle] = useState(initialValues?.title ?? "");
+  const [familyMemberId, setFamilyMemberId] = useState(initialValues?.familyMemberId ?? "");
+  const [dueDate, setDueDate] = useState(initialValues?.dueDate ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 

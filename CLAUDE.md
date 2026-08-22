@@ -139,6 +139,34 @@ exercise the full review → edit → confirm flow (including the time-correctio
 confirming the browser-timezone-safe date handling works) — then cleaned up all test
 rows.
 
-Next: **Phase 5 — Chat/NL** (`/api/chat`, Claude tool-use for `query_schedule` /
-`create_event_draft` / `create_todo_draft`, `ChatProvider`/`ChatPanel` proposal-and-confirm
-UI on the persistent chat bar).
+**Phase 5 — Chat/NL.** Done: `app/api/chat/route.ts` runs a manual agentic loop (not the
+beta Tool Runner — the routing need here, intercept-and-stop on a draft tool call vs.
+continue-the-loop on `query_schedule`, is simple enough that a ~30-line manual loop was
+clearer than learning the runner's gating hooks) against `claude-opus-5` with three tools
+in `lib/chat/tools.ts`: `query_schedule` (executes immediately, results fed back to
+Claude), `create_event_draft`/`create_todo_draft` (return a draft only — no DB write; the
+route stops the loop and returns it to the client). `ChatProvider` (client context: message
+history, open/closed panel state, current draft) + `ChatBar` (always-visible pill, now
+interactive) + `ChatPanel` (conversation view, opens on send or focus) + `ChatShell`
+(switches between the two in the root layout). The proposal card reuses `EventForm`/
+`TodoForm` from Phase 4 directly, pre-filled from the parsed draft — confirming calls new
+`createEventFromChat`/`createTodoFromChat` actions (`source_type: 'chat'`, `source_detail:
+{message}`) rather than duplicating a third form.
+
+Real bug caught and fixed during testing: `query_schedule` was originally handing Claude
+raw ISO timestamps, and Claude read the UTC clock digits as if they were already local
+time (3:00 PM shown on the Schedule page came back from chat as "7:00 PM"). Fixed by
+formatting `starts_at` into an unambiguous local-time string server-side (where the
+correct timezone context lives) before it ever reaches the model, rather than expecting
+Claude to convert it.
+
+Verified end-to-end against the real API and database: a schedule query with no matches,
+a schedule query that correctly cites an email-scan source, an event-draft and a
+todo-draft each correctly parsed (including resolving the family member by name and
+"Friday" to the correct date), confirming a draft through the UI end-to-end (persisted
+with `source_type: 'chat'`), and re-querying that same event back through chat to confirm
+the timezone fix — then cleaned up all test data.
+
+Next: **Phase 6 — Gmail OAuth one-time setup** (GCP project + OAuth client,
+`gmail.readonly` scope, local one-off consent flow that writes a refresh token into
+`rufus.gmail_credentials`).

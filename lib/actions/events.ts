@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { SourceDetail } from "@/lib/types";
 
 export interface EventInput {
   title: string;
@@ -34,6 +35,34 @@ export async function createEvent(input: EventInput): Promise<{ error?: string }
     notes: input.notes?.trim() || null,
     status: "confirmed",
     source_type: "manual",
+  });
+  if (error) return { error: error.message };
+
+  revalidateScheduleViews();
+  return {};
+}
+
+/** Chat-originated events keep the original message as provenance, per the
+ * three-source-type convention (manual/chat/email_scan) — see EventInput. */
+export async function createEventFromChat(
+  input: EventInput,
+  sourceDetail: SourceDetail
+): Promise<{ error?: string }> {
+  const title = input.title.trim();
+  if (!title) return { error: "Title is required." };
+  if (!input.startsAt) return { error: "Date is required." };
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("events").insert({
+    title,
+    family_member_id: input.familyMemberId,
+    starts_at: input.startsAt,
+    all_day: input.allDay,
+    location: input.location?.trim() || null,
+    notes: input.notes?.trim() || null,
+    status: "confirmed",
+    source_type: "chat",
+    source_detail: sourceDetail,
   });
   if (error) return { error: error.message };
 
