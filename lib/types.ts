@@ -49,7 +49,7 @@ export interface Todo {
 export interface KeepInMindItem {
   id: string;
   body: string;
-  icon: "weather" | "reminder" | "package" | "review";
+  icon: "weather" | "reminder" | "package";
   familyMemberId?: string | null;
   dismissed: boolean;
 }

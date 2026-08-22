@@ -1,6 +1,6 @@
-import { Check } from "lucide-react";
 import type { FamilyMember, Todo } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
+import { TodoCheckbox } from "@/components/todos/TodoCheckbox";
 
 interface TodoListProps {
   todos: Todo[];
@@ -25,13 +25,7 @@ export function TodoList({ todos, familyMembers }: TodoListProps) {
           const member = todo.familyMemberId ? memberById.get(todo.familyMemberId) : undefined;
           return (
             <div key={todo.id} className={`flex items-center gap-4 ${todo.completed ? "opacity-60" : ""}`}>
-              <div
-                className={`h-5 w-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
-                  todo.completed ? "bg-primary border-primary" : "border-border"
-                }`}
-              >
-                {todo.completed && <Check size={14} className="text-white" strokeWidth={3} />}
-              </div>
+              <TodoCheckbox id={todo.id} completed={todo.completed} />
               <div className="flex-1">
                 <span
                   className={`text-[16px] font-medium ${

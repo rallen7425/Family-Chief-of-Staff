@@ -119,5 +119,26 @@ Verified in-browser against the live (currently empty except family_members) dat
 all three Today cards and Schedule/Todo show correct empty states, person filter pulls
 the real roster.
 
-Next: **Phase 4 — Manual CRUD** (add/edit dialogs + Server Actions for events/todos,
-todo toggle, `EventReviewDialog` for `pending_review` rows).
+**Phase 4 — Manual CRUD.** Done: `lib/actions/events.ts` (`createEvent`, `updateEvent`,
+`confirmEvent`, `dismissEvent`) and `lib/actions/todos.ts` (`createTodo`, `toggleTodo`) —
+plain async Server Actions called directly from client components via `useTransition`
+(not `<form action>`/`useActionState`), taking typed input objects rather than FormData.
+`components/shared/Modal.tsx` (reusable dialog shell) and `components/events/EventForm.tsx`
+(shared by both AddEventDialog and EventReviewDialog's edit mode) — event start times are
+computed as `new Date(...).toISOString()` in the browser, not the server, so the user's
+actual local timezone resolves correctly regardless of the server's timezone (Vercel
+defaults to UTC). `AddEventDialog`/`AddTodoDialog` wired into the Schedule/Todo page
+headers; `TodoCheckbox` makes todo completion interactive; `PendingReviewNudge` (in
+`components/events/EventReviewDialog.tsx`) replaces the static "needs your review" text
+in `KeepInMindCard` with a real dialog showing full provenance (sender/subject/attachment/
+snippet) and Confirm / Edit / Remove actions.
+
+Verified end-to-end in-browser against the live database: created a real event and todo
+through the UI, toggled todo completion, and inserted a test `pending_review` event to
+exercise the full review → edit → confirm flow (including the time-correction case,
+confirming the browser-timezone-safe date handling works) — then cleaned up all test
+rows.
+
+Next: **Phase 5 — Chat/NL** (`/api/chat`, Claude tool-use for `query_schedule` /
+`create_event_draft` / `create_todo_draft`, `ChatProvider`/`ChatPanel` proposal-and-confirm
+UI on the persistent chat bar).

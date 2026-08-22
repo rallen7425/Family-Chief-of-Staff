@@ -22,6 +22,7 @@ import { DayView } from "@/components/schedule/DayView";
 import { ThreeDayView } from "@/components/schedule/ThreeDayView";
 import { WeekView } from "@/components/schedule/WeekView";
 import { MonthView } from "@/components/schedule/MonthView";
+import { AddEventDialog } from "@/components/events/AddEventDialog";
 
 const VALID_VIEWS: ScheduleViewMode[] = ["day", "3day", "week", "month"];
 
@@ -97,7 +98,10 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
 
   return (
     <>
-      <h1 className="font-display font-semibold text-[28px] leading-tight text-ink">Schedule</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display font-semibold text-[28px] leading-tight text-ink">Schedule</h1>
+        <AddEventDialog familyMembers={familyMembers} />
+      </div>
 
       <ViewModeSwitcher active={view} buildHref={(v) => buildHref({ view: v })} />
 

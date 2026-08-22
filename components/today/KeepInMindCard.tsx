@@ -1,19 +1,20 @@
-import { Bell, Cloud, Bookmark, Package, AlertCircle } from "lucide-react";
-import type { KeepInMindItem, CalendarEvent } from "@/lib/types";
+import { Bell, Cloud, Bookmark, Package } from "lucide-react";
+import type { FamilyMember, KeepInMindItem, CalendarEvent } from "@/lib/types";
+import { PendingReviewNudge } from "@/components/events/EventReviewDialog";
 
 const ICONS = {
   weather: Cloud,
   reminder: Bookmark,
   package: Package,
-  review: AlertCircle,
 } as const;
 
 interface KeepInMindCardProps {
   items: KeepInMindItem[];
   pendingReviewEvents: CalendarEvent[];
+  familyMembers: FamilyMember[];
 }
 
-export function KeepInMindCard({ items, pendingReviewEvents }: KeepInMindCardProps) {
+export function KeepInMindCard({ items, pendingReviewEvents, familyMembers }: KeepInMindCardProps) {
   const hasContent = items.length > 0 || pendingReviewEvents.length > 0;
 
   return (
@@ -36,13 +37,7 @@ export function KeepInMindCard({ items, pendingReviewEvents }: KeepInMindCardPro
           );
         })}
         {pendingReviewEvents.map((event) => (
-          <li key={event.id} className="flex items-start gap-3">
-            <AlertCircle size={20} className="text-primary mt-[1px] shrink-0" />
-            <span className="text-[15px] font-medium leading-relaxed text-ink">
-              &ldquo;{event.title}&rdquo; was added from an email —{" "}
-              <span className="text-primary font-semibold">needs your review</span>
-            </span>
-          </li>
+          <PendingReviewNudge key={event.id} event={event} familyMembers={familyMembers} />
         ))}
       </ul>
     </section>

@@ -26,7 +26,11 @@ export default async function TodayPage() {
         </p>
         <h1 className="font-display font-semibold text-[32px] leading-tight text-ink">Today</h1>
       </div>
-      <KeepInMindCard items={keepInMind} pendingReviewEvents={pendingReview} />
+      <KeepInMindCard
+        items={keepInMind}
+        pendingReviewEvents={pendingReview}
+        familyMembers={familyMembers}
+      />
       <ScheduleCard events={upcomingEvents} familyMembers={familyMembers} />
       <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
     </>
