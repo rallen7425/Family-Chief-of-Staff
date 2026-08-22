@@ -167,6 +167,24 @@ todo-draft each correctly parsed (including resolving the family member by name 
 with `source_type: 'chat'`), and re-querying that same event back through chat to confirm
 the timezone fix — then cleaned up all test data.
 
-Next: **Phase 6 — Gmail OAuth one-time setup** (GCP project + OAuth client,
-`gmail.readonly` scope, local one-off consent flow that writes a refresh token into
-`rufus.gmail_credentials`).
+**Phase 6 — Gmail OAuth one-time setup.** Done. GCP project **"Family Chief of Staff"**
+(deliberately not named "Rufus" — the product name may change and this avoids a legacy
+name trail in Google's records), Gmail API enabled, OAuth consent screen configured
+External + Testing status with `rallen7425@gmail.com` as a test user and the
+`gmail.readonly` scope, OAuth client of type **Desktop app** (accepts any localhost
+redirect port without pre-registration — no public redirect URL needed).
+`scripts/gmail/get-refresh-token.ts` — a one-time local script, not part of the deployed
+app — opens the consent URL, runs a tiny local HTTP server to catch the
+`localhost:3457/oauth2callback` redirect, exchanges the code for tokens, and upserts the
+refresh token into `rufus.gmail_credentials` via the service-role client. Client
+ID/secret live in `.env.local` only (`GMAIL_OAUTH_CLIENT_ID` / `GMAIL_OAUTH_CLIENT_SECRET`).
+
+Verified: ran the script (user completed the Google sign-in step — an OAuth login is
+something only the account owner can do), confirmed `rallen7425@gmail.com` connected,
+then a throwaway script listed 5 real inbox message subjects/senders via the stored
+refresh token to prove it actually authenticates — then deleted that throwaway script.
+
+Next: **Phase 7 — Email-scan pipeline** (fetch new Gmail messages, parse body + docx/pdf
+attachments, Claude extraction batched like Distilled's pipeline, insert as
+`pending_review` with full provenance, GitHub Actions cron + `/api/pipeline/gmail-scan`
+shared-secret trigger).
