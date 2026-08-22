@@ -1,0 +1,215 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Family OS - Today Dashboard</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&amp;family=Instrument+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        mist: '#F7F9FB',
+                        surface: '#FFFFFF',
+                        ink: '#23262B',
+                        border: '#E1E5EB',
+                        'muted-label': '#8B93A0',
+                        'muted-text': '#5C6570',
+                        primary: {
+                            DEFAULT: '#3B6FE5',
+                            hover: '#2C56C4'
+                        },
+                        accent: {
+                            coral: '#F0714B',
+                            teal: '#2FA9A0',
+                            gold: '#E3A73A',
+                            berry: '#E8567A'
+                        }
+                    },
+                    fontFamily: {
+                        display: ['Bricolage Grotesque', 'sans-serif'],
+                        body: ['Instrument Sans', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        'card': '20px',
+                        'pill': '9999px',
+                        'input': '12px'
+                    }
+                }
+            }
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .material-symbols-outlined {
+                font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            }
+            .hide-scrollbar::-webkit-scrollbar {
+                display: none;
+            }
+            .hide-scrollbar {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+        
+        body {
+            background-color: theme('colors.mist');
+            font-family: theme('fontFamily.body');
+            color: theme('colors.ink');
+            max-width: 430px; /* Modern mobile width */
+            margin: 0 auto;
+            min-height: 100vh;
+            position: relative;
+            padding-bottom: 140px; /* Space for floating elements and thin nav */
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body class="antialiased border-t-[3px] border-t-primary bg-mist">
+<!-- HEADER: Minimalist top bar -->
+<header class="pt-8 pb-4 px-6 flex flex-col gap-5">
+<div class="flex justify-between items-center w-full px-4 py-3">
+<!-- Left: Hamburger Menu -->
+<button class="text-ink hover:text-primary transition-colors flex items-center">
+<svg fill="none" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 12H21M3 6H21M3 18H21" stroke="#23262B" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+<!-- Right: Action Group -->
+<div class="flex items-center gap-4"><div class="flex items-center gap-2"><button class="w-10 h-10 rounded-full flex items-center justify-center text-ink hover:text-primary transition-colors"><span class="material-symbols-outlined" style="font-size: 24px; color: #23262B;">mail</span></button><button class="w-10 h-10 rounded-full flex items-center justify-center text-ink hover:text-primary transition-colors"><span class="material-symbols-outlined" style="font-size: 24px; color: #23262B;">notifications</span></button><button class="w-10 h-10 rounded-full overflow-hidden border border-border shadow-sm hover:ring-2 hover:ring-primary/20 transition-all"><img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKEJ69x7zY-MLelQss7OrxE9MMR6oSR7fD6PXT43ddbNghqqac5L8x77k0Ulte7x0__kj2mDlSrru_C2qb3R9wAQDm-mMwQKLIWENnKnrVI-ohH9yUVzVCo5ZMnTND_sGgtEXufvwkJ5yT9T1gc__-bkaypy3ws21rrUU7hyuOeenggOzQihtFl_pisAOiwMsuvEj-Je6-A4oUsAmlGH1dafBihLITnHRBJEc-IgjEzHXdDa5eQShg"></button></div></div>
+</div>
+<div>
+<p class="text-muted-text text-[13px] font-medium tracking-wide mb-1 uppercase">Sat, Aug 22</p>
+<h1 class="font-display font-semibold text-[32px] leading-tight text-ink">Today for the Allens</h1>
+</div>
+</header>
+<!-- MAIN CONTENT -->
+<main class="px-6 py-2 flex flex-col gap-6">
+<!-- KEEP IN MIND CARD -->
+<div class="flex gap-2 overflow-x-auto hide-scrollbar pb-2">
+<button class="px-6 py-2 rounded-pill bg-primary text-white text-[14px] font-semibold shrink-0">Today</button>
+<button class="px-6 py-2 rounded-pill bg-surface border border-border text-muted-text text-[14px] font-medium shrink-0 hover:bg-mist transition-colors">Scheduled</button>
+<button class="px-6 py-2 rounded-pill bg-surface border border-border text-muted-text text-[14px] font-medium shrink-0 hover:bg-mist transition-colors">Message</button>
+<button class="px-6 py-2 rounded-pill bg-surface border border-border text-muted-text text-[14px] font-medium shrink-0 hover:bg-mist transition-colors">Todo</button>
+</div><section class="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
+<div class="flex items-center gap-2 mb-5">
+<span class="material-symbols-outlined text-[18px] text-muted-text">notifications</span>
+<h2 class="text-[12px] font-bold tracking-widest text-muted-text uppercase">Keep in mind</h2>
+</div>
+<ul class="flex flex-col gap-4">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-muted-text mt-[1px] shrink-0">cloud_queue</span>
+<span class="text-[15px] font-medium leading-relaxed text-ink">Rain after 3 — soccer pickup may move indoors</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-muted-text mt-[1px] shrink-0">bookmark_border</span>
+<span class="text-[15px] font-medium leading-relaxed text-ink">Liam's permission slip is due Monday</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-muted-text mt-[1px] shrink-0">inventory_2</span>
+<span class="text-[15px] font-medium leading-relaxed text-ink">Mikayla's teacher gift still needs wrapping</span>
+</li>
+</ul>
+</section>
+<!-- SCHEDULE CARD -->
+<section class="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
+<div class="mb-6"><div class="flex justify-between items-center">
+<h2 class="text-[12px] font-bold tracking-widest text-muted-text uppercase">Schedule</h2>
+<div class="flex items-center gap-4">
+<button class="text-muted-text hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+<a class="text-[13px] font-semibold text-primary hover:underline" href="#">View Calendar</a>
+</div>
+</div></div>
+<div class="flex flex-col gap-6">
+<!-- Schedule Item 1 -->
+<div class="flex gap-4 items-start relative">
+<div class="w-12 text-[13px] text-muted-label font-medium pt-1 shrink-0 text-right">3:15p</div>
+<div class="w-[3px] self-stretch bg-accent-coral rounded-full mt-1"></div>
+<div class="flex-1 pb-2">
+<h3 class="font-semibold text-[17px] text-ink leading-tight mb-1">Pickup — Mikayla, dance</h3>
+<p class="text-[14px] text-muted-label">Riverside Studio</p>
+</div>
+</div>
+<!-- Schedule Item 2 -->
+<div class="flex gap-4 items-start relative">
+<div class="w-12 text-[13px] text-muted-label font-medium pt-1 shrink-0 text-right">4:00p</div>
+<div class="w-[3px] self-stretch bg-accent-teal rounded-full mt-1"></div>
+<div class="flex-1 pb-2">
+<h3 class="font-semibold text-[17px] text-ink leading-tight mb-1">Dentist — Dad</h3>
+<p class="text-[14px] text-muted-label">Dr. Kessler, 40 min</p>
+</div>
+</div>
+<!-- Schedule Item 3 -->
+<div class="flex gap-4 items-start relative">
+<div class="w-12 text-[13px] text-muted-label font-medium pt-1 shrink-0 text-right">5:30p</div>
+<div class="w-[3px] self-stretch bg-accent-gold rounded-full mt-1"></div>
+<div class="flex-1">
+<h3 class="font-semibold text-[17px] text-ink leading-tight mb-1">Soccer practice — Liam</h3>
+<p class="text-[14px] text-muted-label">Fields close at 7</p>
+</div>
+</div>
+</div>
+</section>
+<!-- NEEDS DOING CARD -->
+<section class="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-[12px] font-bold tracking-widest text-muted-text uppercase">Needs Doing</h2>
+<a class="text-[13px] font-semibold text-primary hover:underline" href="#">See all</a>
+</div>
+<div class="flex flex-col gap-5">
+<label class="flex items-center gap-4 cursor-pointer group">
+<div class="relative flex items-center justify-center">
+<input class="peer h-5 w-5 rounded-md border-2 border-border text-primary focus:ring-primary/20 transition-all appearance-none checked:bg-primary checked:border-primary" type="checkbox">
+<span class="material-symbols-outlined absolute text-white text-[16px] opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<span class="flex-1 text-[16px] font-medium text-ink group-hover:text-ink/80 transition-colors">Order Liam's cleats</span>
+<div class="w-2 h-2 rounded-full bg-accent-gold"></div>
+</label>
+<label class="flex items-center gap-4 cursor-pointer group">
+<div class="relative flex items-center justify-center">
+<input class="peer h-5 w-5 rounded-md border-2 border-border text-primary focus:ring-primary/20 transition-all appearance-none checked:bg-primary checked:border-primary" type="checkbox">
+<span class="material-symbols-outlined absolute text-white text-[16px] opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<span class="flex-1 text-[16px] font-medium text-ink group-hover:text-ink/80 transition-colors">Sign field trip form</span>
+<div class="w-2 h-2 rounded-full bg-accent-coral"></div>
+</label>
+<label class="flex items-center gap-4 cursor-pointer group opacity-60">
+<div class="relative flex items-center justify-center">
+<input checked="" class="peer h-5 w-5 rounded-md border-2 border-border text-primary focus:ring-primary/20 transition-all appearance-none checked:bg-primary checked:border-primary" type="checkbox">
+<span class="material-symbols-outlined absolute text-white text-[16px] opacity-0 peer-checked:opacity-100 pointer-events-none">check</span>
+</div>
+<span class="flex-1 text-[16px] font-medium text-muted-label line-through decoration-muted-label/50">Refill Mikayla's prescription</span>
+</label>
+</div>
+</section>
+</main>
+<!-- CHAT BOX: Floating Action Pill -->
+<div class="fixed left-0 right-0 w-full max-w-[430px] mx-auto px-6 z-40 pointer-events-none flex justify-center bottom-6">
+<div class="pointer-events-auto bg-surface/90 backdrop-blur-md rounded-pill border border-border shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-2 pr-4 flex items-center gap-3 w-[90%] transition-transform hover:scale-[1.02]">
+<button class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 transition-colors shrink-0">
+<span class="material-symbols-outlined text-[22px]">add</span>
+</button>
+<input class="flex-1 bg-transparent border-none p-0 text-[15px] font-medium text-ink placeholder:text-muted-label focus:ring-0" placeholder="Chat with Rufus..." type="text">
+<div class="flex items-center gap-1 text-muted-label shrink-0">
+<button class="w-10 h-10 rounded-full hover:bg-mist hover:text-ink flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+<button class="w-10 h-10 rounded-full hover:bg-mist hover:text-ink flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[20px]">graphic_eq</span>
+</button>
+</div>
+</div>
+</div>
+<!-- NAVIGATION: Thin High-Contrast Home Bar -->
+
+
+</body></html>
