@@ -6,6 +6,58 @@
 
 ---
 
+## Session status (paused 2026-08-22)
+
+All 8 build phases are complete and deployed. Since then, the user has been doing
+real-world usage testing (their own account, real Gmail inbox, real production database)
+and reporting concrete bugs/gaps one at a time, each investigated to root cause, fixed,
+verified against real data, and deployed. Session paused here while the user does a
+hands-on functional review; no specific area was flagged going in — next session should
+start by asking what they found, rather than assuming any of the items below still need
+work.
+
+**Fixed and deployed this session** (see the dated sections below for full detail):
+- Keep in Mind redesign (capped at 3 + "View all"), `/notifications` inbox as a real
+  page between the bell and `/review`, `/review` page redesigned with grouping/checkbox
+  select/per-group+global approve/remove.
+- Chat's `query_schedule` semantic matching (dropped the literal-keyword filter that
+  missed "Scrimmage" as a "game").
+- Recurring events via chat (asks for an end date instead of creating one occurrence)
+  and a duration/end-time field on the manual Add Event form.
+- Historical email backfill for Austin Prep (Nora's school).
+- **Critical systemic timezone bug**: all server-rendered times were silently correct
+  only by local-machine coincidence and would have been 4-5 hours off in real
+  production (Vercel defaults to UTC). Fixed via `instrumentation.ts`. **Explicitly
+  verified live on production** (not just locally) — Football practice now correctly
+  shows 4:00 PM on `family-chief-of-staff.vercel.app`.
+- Email body-extraction bug (empty `text/plain` parts from veracross.com/Austin Prep
+  hid real content) — fixed and 14 affected emails reprocessed, recovering real
+  events/todos.
+- Date-anchor bug in email extraction (prevented a repeat of a wrong-year extraction).
+- Today screen day-label bug (tomorrow's events looked like today's with no day shown).
+- Data cleanup: deduped Grandparents' Day double-entries, reassigned un-colored
+  Sophomore Retreat/Leader Training events to Ben.
+- Mobile keyboard covering the chat input (`100vh` → `100dvh` in `ChatPanel.tsx`).
+
+**Confirmed working via direct production testing, but not yet confirmed by the user
+in their own session:**
+- Grandparents' Day — chat correctly answers with both dates, location, and the
+  related todo, tested directly against the live `/api/chat` endpoint right after the
+  body-extraction fix deployed. The user's original "still no record" report may have
+  been against a slightly stale deploy or a cached mobile session — worth a quick
+  re-check with them next session if it comes up again.
+
+**Not verifiable by tooling — needs the user's real-device confirmation:**
+- Mobile keyboard fix — headless browser tooling can't trigger a real on-screen
+  keyboard to confirm the resize behavior actually works as intended.
+- Whether the Today-screen day-label fix now reads clearly (was based on the user's
+  description of the underlying confusion, not a screenshot).
+
+**Next session should:** start from whatever the user found during this review pass —
+don't assume the list above is the agenda unless they bring one of these items back up.
+
+---
+
 ## Deployment & access
 
 | | |
