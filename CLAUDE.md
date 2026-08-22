@@ -184,7 +184,38 @@ something only the account owner can do), confirmed `rallen7425@gmail.com` conne
 then a throwaway script listed 5 real inbox message subjects/senders via the stored
 refresh token to prove it actually authenticates — then deleted that throwaway script.
 
-Next: **Phase 7 — Email-scan pipeline** (fetch new Gmail messages, parse body + docx/pdf
-attachments, Claude extraction batched like Distilled's pipeline, insert as
-`pending_review` with full provenance, GitHub Actions cron + `/api/pipeline/gmail-scan`
-shared-secret trigger).
+**Phase 7 — Email-scan pipeline.** Done: `scripts/pipeline/gmail/` (client + message/
+attachment fetching, MIME-tree walk for body text + docx/pdf attachment parts),
+`scripts/pipeline/extract/` (`parseDocx.ts` via `mammoth`, `parsePdf.ts` via `unpdf` —
+returns per-page text for page-number provenance, `extractEvents.ts` — Claude structured
+output via `zodOutputFormat`, **one call per message, not batched** like Distilled's
+article pipeline: deliberate adaptation, since batching several unrelated emails into one
+call would blur per-item provenance and a household inbox's volume doesn't need the
+cost optimization batching exists for), `scripts/pipeline/write.ts` (resolves
+`person_hint` by name, inserts `pending_review` + full `source_detail`),
+`scripts/pipeline/index.ts` (orchestrator — dedupes against `email_scan_log` *before* any
+fetch/parse/Claude work, one message's failure doesn't block the rest),
+`app/api/pipeline/gmail-scan/route.ts` (shared-secret check), `.github/workflows/
+gmail-scan.yml` (2-hour cron + manual dispatch — needs repo variable `APP_URL` and secret
+`CRON_SECRET` set once Phase 8 deploys). New `lib/householdTime.ts` (`@date-fns/tz`):
+this path runs server-side with no browser to resolve local time from, unlike manual/chat
+entry, so it needs a fixed `HOUSEHOLD_TIMEZONE` (defaults to `America/New_York` — override
+in `.env.local` if that's wrong for this household) rather than relying on the process's
+ambient timezone (Vercel defaults to UTC).
+
+Verified end-to-end against the real inbox and real database (not a synthetic test — I
+can't send email on the user's behalf, so this ran against whatever was actually there):
+25 messages scanned, 25 processed, 0 errors, 19 events + 5 todos created as
+`pending_review`. This turned out to include the exact real-world scenario MVP-Spec.md
+was written from — a live "Varsity/JV Football" email from St. John's Prep with a real
+`.docx` attachment — confirming the docx path (13 of the 19 events) with correct per-item
+`extractedSnippet` quotes and `attachmentName` provenance, alongside body-text-only
+extraction for the rest. Re-running confirmed dedupe works (25/25 skipped, 0 wasted Claude
+calls). One real quality issue found and fixed: a marketing "offer expires" email was
+extracted as a todo — tightened the system prompt to explicitly exclude promotional/
+newsletter content, which a batch of curated test emails wouldn't have caught. Removed
+that one bad row and the throwaway inspection scripts; left the ~23 genuinely accurate
+`pending_review` items in place for real review through the app.
+
+Next: **Phase 8 — Deploy** (link Vercel, set prod env vars, first deploy, add `_meta.apps`
+row, point the GitHub Actions cron at the prod URL, smoke-test end to end).

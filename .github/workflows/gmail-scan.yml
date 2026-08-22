@@ -1,0 +1,20 @@
+name: Gmail Scan Pipeline
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'          # every 2 hours — a household inbox has far lower volume/urgency than Distilled's hourly content pipeline
+  workflow_dispatch:                # manual trigger from GitHub UI
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Gmail scan
+        run: |
+          curl -f -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ vars.APP_URL }}/api/pipeline/gmail-scan"
+        # Set repo variable APP_URL (Settings -> Secrets and variables -> Actions -> Variables)
+        # to the deployed Vercel URL, and repo secret CRON_SECRET to match .env's CRON_SECRET,
+        # once Phase 8 deploys the app.
