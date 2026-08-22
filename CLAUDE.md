@@ -243,10 +243,16 @@ change). Vercel project linked, all 7 production env vars set, deployed.
 The Vercel project was initially auto-named "rufus" by `vercel link` (defaults to the
 local folder name) before I caught the naming inconsistency — renamed to
 `family-chief-of-staff` via `vercel project rename`, which changes the project's identity
-but does **not** retroactively move the live domain alias to match; had to explicitly
-`vercel alias set` the new `<name>.vercel.app` domain and remove the old `rufus-olive.
-vercel.app` one Vercel had auto-generated (a random suffix because the plain `rufus.
-vercel.app` was already taken by someone else).
+but does **not** retroactively move the live domain alias to match. First attempt used
+`vercel alias set <deployment-url> family-chief-of-staff.vercel.app` — this worked for
+that one deployment, but silently broke on the *next* `vercel --prod` run: `alias set`
+pins to one specific deployment hash and does not follow subsequent deploys, so
+`/review` (added the same day) 404'd on the "live" domain while the auto-generated
+`rufus-olive.vercel.app` alias correctly showed the new route. **Fixed properly with
+`vercel domains add family-chief-of-staff.vercel.app`** instead — this registers it as a
+real project domain that auto-follows every future production deploy, the same as
+Vercel's own auto-generated aliases. Use `domains add`, not `alias set`, for any domain
+meant to stay current — `alias set` is only for a one-off pin to a specific deployment.
 
 Bigger catch: that newly-aliased domain came back with a 302 to `vercel.com/sso-api` —
 Vercel's account-wide SSO deployment protection (`ssoProtection.deploymentType:
