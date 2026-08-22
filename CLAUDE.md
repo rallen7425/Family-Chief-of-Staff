@@ -6,6 +6,25 @@
 
 ---
 
+## Deployment & access
+
+| | |
+|---|---|
+| **Live site** | https://family-chief-of-staff.vercel.app |
+| **GitHub repo** | git@github.com:rallen7425/Family-Chief-of-Staff.git |
+| **Branch** | main |
+| **Vercel project** | rick-allen-s-projects/family-chief-of-staff |
+| **Local dev** | `npm run dev` → http://localhost:3000 |
+
+GitHub repo and Vercel project are deliberately named "Family-Chief-of-Staff", not
+"Rufus" — the product name may still change, and this avoids a legacy name trail (same
+reasoning applied to the GCP OAuth app in Phase 6).
+
+> **Deploy:** `vercel --prod` from the repo root. No CI auto-deploy configured — matches
+> Distilled/PM ReArchitected's manual-deploy convention.
+
+---
+
 ## What this app is
 
 Rufus is a single-household "family chief of staff" app: a Today dashboard, a full
@@ -217,5 +236,43 @@ newsletter content, which a batch of curated test emails wouldn't have caught. R
 that one bad row and the throwaway inspection scripts; left the ~23 genuinely accurate
 `pending_review` items in place for real review through the app.
 
-Next: **Phase 8 — Deploy** (link Vercel, set prod env vars, first deploy, add `_meta.apps`
-row, point the GitHub Actions cron at the prod URL, smoke-test end to end).
+**Phase 8 — Deploy.** Done. Repo pushed to GitHub as `rallen7425/Family-Chief-of-Staff`
+(not `rufus` — same naming reasoning as the GCP OAuth app: the product name may still
+change). Vercel project linked, all 7 production env vars set, deployed.
+
+The Vercel project was initially auto-named "rufus" by `vercel link` (defaults to the
+local folder name) before I caught the naming inconsistency — renamed to
+`family-chief-of-staff` via `vercel project rename`, which changes the project's identity
+but does **not** retroactively move the live domain alias to match; had to explicitly
+`vercel alias set` the new `<name>.vercel.app` domain and remove the old `rufus-olive.
+vercel.app` one Vercel had auto-generated (a random suffix because the plain `rufus.
+vercel.app` was already taken by someone else).
+
+Bigger catch: that newly-aliased domain came back with a 302 to `vercel.com/sso-api` —
+Vercel's account-wide SSO deployment protection (`ssoProtection.deploymentType:
+"all_except_custom_domains"`, the same default every sibling app has) was gating it
+behind a Vercel login, which would have meant no one else in the family could ever open
+the app. The *original* auto-generated production alias had been silently exempt from
+this (some domains-vs-aliases distinction in how Vercel provisions the very first project
+domain vs. a `vercel alias set` added later), but a manually-added alias is not
+automatically exempt. Fixed by disabling SSO protection outright for this project
+(`vercel project protection disable family-chief-of-staff --sso`) — this is a personal
+app, not internal tooling, so there's no reason to gate it behind Vercel auth at all;
+its actual security boundary is Supabase RLS + the service-role-only data layer, not
+Vercel's login.
+
+**Production URL: https://family-chief-of-staff.vercel.app**
+
+GitHub Actions cron: repo secret `CRON_SECRET` and repo variable `APP_URL` (=
+`https://family-chief-of-staff.vercel.app`) set on `rallen7425/Family-Chief-of-Staff` —
+user configured these manually since `gh` CLI wasn't authenticated in this environment.
+**If `APP_URL` was set to the old `rufus-olive.vercel.app` value before this rename, it
+needs updating to the URL above** or the cron trigger will hit a dead alias.
+
+Verified end-to-end on the live production deployment: all four routes return 200, the
+Today screen renders real data (the same events/todos from the Phase 7 test) against
+production Supabase, `/api/chat` answers correctly with live citations, and
+`/api/pipeline/gmail-scan` correctly deduped 24 already-scanned messages and processed 1
+genuinely new one that had arrived in the inbox since the last local test run.
+
+**All 8 phases of the original implementation plan are now complete.**
