@@ -17,6 +17,7 @@ function mapEvent(row: EventRow): CalendarEvent {
     status: row.status,
     sourceType: row.source_type,
     sourceDetail: row.source_detail ?? undefined,
+    recurrenceId: row.recurrence_id ?? undefined,
   };
 }
 

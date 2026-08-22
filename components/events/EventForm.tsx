@@ -12,6 +12,9 @@ export interface EventFormInitialValues {
   time: string; // HH:mm, or "" for all-day
   location: string;
   notes: string;
+  endTime?: string; // HH:mm
+  repeatsWeekly?: boolean;
+  repeatUntil?: string; // YYYY-MM-DD
 }
 
 interface EventFormProps {
@@ -35,8 +38,11 @@ export function EventForm({
   const [familyMemberId, setFamilyMemberId] = useState(initialValues?.familyMemberId ?? "");
   const [date, setDate] = useState(initialValues?.date ?? "");
   const [time, setTime] = useState(initialValues?.time ?? "");
+  const [endTime, setEndTime] = useState(initialValues?.endTime ?? "");
   const [location, setLocation] = useState(initialValues?.location ?? "");
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [repeatsWeekly, setRepeatsWeekly] = useState(initialValues?.repeatsWeekly ?? false);
+  const [repeatUntil, setRepeatUntil] = useState(initialValues?.repeatUntil ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -52,20 +58,34 @@ export function EventForm({
       setError("Date is required.");
       return;
     }
+    if (repeatsWeekly && !repeatUntil) {
+      setError("Pick an end date for the repeat.");
+      return;
+    }
 
     // Computed in the browser so the user's actual local timezone resolves
     // the wall-clock time — a server (Vercel defaults to UTC) would
     // otherwise parse a naive "date+time" string in the wrong timezone.
     const startsAt = time ? new Date(`${date}T${time}`) : new Date(`${date}T00:00`);
+    const endsAt = time && endTime ? new Date(`${date}T${endTime}`) : undefined;
 
     startTransition(async () => {
       const result = await onSubmit({
         title,
         familyMemberId: familyMemberId || null,
         startsAt: startsAt.toISOString(),
+        endsAt: endsAt?.toISOString(),
         allDay: !time,
         location,
         notes,
+        recurrence: repeatsWeekly
+          ? {
+              localDate: date,
+              localStartTime: time || undefined,
+              localEndTime: time && endTime ? endTime : undefined,
+              untilDate: repeatUntil,
+            }
+          : undefined,
       });
       if (result.error) {
         setError(result.error);
@@ -129,10 +149,27 @@ export function EventForm({
             type="time"
             className={FORM_INPUT_CLASS}
             value={time}
-            onChange={(e) => setTime(e.target.value)}
+            onChange={(e) => {
+              setTime(e.target.value);
+              if (!e.target.value) setEndTime("");
+            }}
           />
         </div>
       </div>
+      {time && (
+        <div>
+          <label className={FORM_LABEL_CLASS} htmlFor="event-end-time">
+            End time (optional)
+          </label>
+          <input
+            id="event-end-time"
+            type="time"
+            className={FORM_INPUT_CLASS}
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+          />
+        </div>
+      )}
       <div>
         <label className={FORM_LABEL_CLASS} htmlFor="event-location">
           Location
@@ -157,6 +194,35 @@ export function EventForm({
           placeholder="Optional"
         />
       </div>
+      <div>
+        <label className={FORM_LABEL_CLASS} htmlFor="event-repeats">
+          Repeats
+        </label>
+        <select
+          id="event-repeats"
+          className={FORM_INPUT_CLASS}
+          value={repeatsWeekly ? "weekly" : "none"}
+          onChange={(e) => setRepeatsWeekly(e.target.value === "weekly")}
+        >
+          <option value="none">Does not repeat</option>
+          <option value="weekly">Weekly</option>
+        </select>
+      </div>
+      {repeatsWeekly && (
+        <div>
+          <label className={FORM_LABEL_CLASS} htmlFor="event-repeat-until">
+            Until
+          </label>
+          <input
+            id="event-repeat-until"
+            type="date"
+            className={FORM_INPUT_CLASS}
+            value={repeatUntil}
+            onChange={(e) => setRepeatUntil(e.target.value)}
+            min={date || undefined}
+          />
+        </div>
+      )}
       {error && <p className="text-[13px] text-accent-berry font-medium">{error}</p>}
       <div className="flex gap-3 mt-2">
         <button

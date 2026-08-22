@@ -37,7 +37,7 @@ export const CHAT_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_event_draft",
     description:
-      "Propose a new calendar event from something the user described in natural language, e.g. 'Ben has a soccer game Friday at 3 at the middle school'. This does NOT save the event — it only returns a draft for the user to review and confirm in the app UI.",
+      "Propose a new calendar event from something the user described in natural language, e.g. 'Ben has a soccer game Friday at 3 at the middle school'. This does NOT save the event — it only returns a draft for the user to review and confirm in the app UI. If the user describes a recurring pattern (e.g. 'every Saturday', 'every Monday and Wednesday') but hasn't said how long it should run, DO NOT call this tool yet — ask a short clarifying question first (an end date, or a number of weeks), then call it once you know.",
     input_schema: {
       type: "object",
       properties: {
@@ -46,13 +46,21 @@ export const CHAT_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "The family member's first name this event is for, if mentioned. Omit for a whole-family event.",
         },
-        date: { type: "string", description: "ISO date (YYYY-MM-DD) the event occurs on." },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD) the first/only occurrence is on." },
         time: {
           type: "string",
           description: "24-hour time (HH:mm) the event starts, if a specific time was mentioned. Omit for an all-day event.",
         },
+        end_time: {
+          type: "string",
+          description: "24-hour time (HH:mm) the event ends, only if a duration or end time was mentioned or clearly implied (e.g. 'a 1-hour lesson' from a stated start time). Omit otherwise.",
+        },
         location: { type: "string", description: "Where the event takes place, if mentioned." },
         notes: { type: "string", description: "Any other relevant detail mentioned." },
+        recurrence_until: {
+          type: "string",
+          description: "ISO date (YYYY-MM-DD) of the last occurrence, ONLY when the user described a recurring weekly pattern (e.g. 'every Saturday') AND has told you how long it should run. Omit entirely for a one-off event, and omit until you've asked and gotten an answer for a recurring one — never guess a duration.",
+        },
       },
       required: ["title", "date"],
     },
@@ -162,8 +170,10 @@ export function buildDraftFromToolUse(
     person_name?: string;
     date: string;
     time?: string;
+    end_time?: string;
     location?: string;
     notes?: string;
+    recurrence_until?: string;
   };
   const member = resolveFamilyMember(input.person_name, familyMembers);
   return {
@@ -173,7 +183,9 @@ export function buildDraftFromToolUse(
     familyMemberName: member?.name ?? input.person_name ?? null,
     date: input.date,
     time: input.time ?? "",
+    endTime: input.end_time ?? "",
     location: input.location ?? "",
     notes: input.notes ?? "",
+    recurrenceUntil: input.recurrence_until ?? "",
   };
 }

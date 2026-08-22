@@ -325,6 +325,56 @@ date-ranged result set and the system prompt explicitly tells Claude to reason o
 actual titles itself (a household's event volume is small enough that this costs
 nothing, and it's far more reliable than string matching).
 
+## Recurring events + event duration + notifications inbox
+
+Real usage surfaced two more gaps: "Nora has tumbling every Saturday" via chat only
+created one event (no recurrence concept existed at all), and the Add Event form had no
+way to set an end time/duration.
+
+- **`rufus.events.recurrence_id`** (new column, nullable uuid) tags every row generated
+  from one recurring input, so a future bulk-edit/cancel-series feature has something to
+  key off — not built now (the user only asked for *creating* a series), but effectively
+  unbuildable without this link once rows already exist without it.
+- **`EventForm`** gained an "End time" field (only shown once a start time is set) and a
+  "Repeats" select (None/Weekly) that reveals an "Until" date when active.
+  `lib/actions/events.ts`'s `createEvent`/`createEventFromChat` both funnel through a
+  shared `buildEventRows()`: no recurrence → the existing single-row insert (now also
+  carrying `ends_at`); recurrence present → a weekly-dated series, all sharing one fresh
+  `recurrence_id`. Each occurrence's UTC instant is recomputed independently via
+  `householdLocalToInstant()` (same helper Phase 7's email-scan pipeline uses) rather
+  than adding a fixed 7×24h offset to the first occurrence — a multi-month weekly series
+  can cross a DST boundary, and a fixed offset would silently shift the wall-clock time
+  after the transition.
+- **Chat won't guess a duration.** `create_event_draft`'s tool description and the
+  system prompt both now say: if the user describes a recurring pattern without saying
+  how long it should run, ask first (an end date or a number of weeks) rather than
+  assuming "the season" or similar. Verified: "Nora has tumbling every Saturday at 10am"
+  correctly triggers a clarifying question instead of creating anything; answering
+  "until October 24" produces a draft with `recurrenceUntil` set, which `EventForm`
+  (reused for the chat proposal card, same as before) pre-fills into the Repeats/Until
+  fields. End-to-end verified against the real database: 10 Saturday occurrences, Aug 22
+  through Oct 24, all sharing one `recurrence_id`, correct 10:00–10:45 AM Eastern on
+  every row (confirming the DST-safe per-occurrence computation actually works, not just
+  the first one).
+- **New `/notifications` page** sits between the header's bell icon and `/review` — the
+  bell no longer links straight to `/review`. Right now it has exactly one possible
+  entry ("N new entries need approval," linking to `/review`) since pending-review
+  counts are the only notification source that exists; deliberately not built as a
+  generic notification framework for hypothetical future notification types that don't
+  exist yet. Keep in Mind's own "N new entries need approval" line is unchanged and
+  still links directly to `/review` — both routes converge on the same
+  `getPendingReviewEvents()`/`getPendingReviewTodos()` counts.
+
+Also ran a one-off historical backfill (`scripts/backfill-austin-prep.ts`, since deleted
+— reused the standing pipeline's internals with a custom unbounded Gmail search instead
+of the cron's `newer_than:2d` window) for Nora's school, Austin Prep — the user's
+scenario wasn't hypothetical either: a real "Game Day Cheer Practice Schedule" email
+correctly produced 1 event, and a real multi-message testing-accommodations thread
+correctly produced 4 todos, while every newsletter/administrative email in the batch
+(bus registration, textbook purchasing, grandparents' day, etc.) correctly produced
+nothing — the marketing-content exclusion from Phase 7 is generalizing well beyond just
+spam.
+
 ## Known follow-ups (not yet scheduled)
 
 - Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per

@@ -22,7 +22,7 @@ export function AppHeader({ pendingReviewCount }: AppHeaderProps) {
           <Mail size={22} strokeWidth={2} />
         </button>
         <Link
-          href="/review"
+          href="/notifications"
           aria-label={pendingReviewCount > 0 ? `Notifications (${pendingReviewCount} new)` : "Notifications"}
           className="relative w-10 h-10 rounded-full flex items-center justify-center text-ink hover:text-primary transition-colors"
         >

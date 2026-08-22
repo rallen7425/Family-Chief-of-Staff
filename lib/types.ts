@@ -33,6 +33,9 @@ export interface CalendarEvent {
   status: ItemStatus;
   sourceType: SourceType;
   sourceDetail?: SourceDetail;
+  /** Shared across every row generated from one recurring-event input (e.g.
+   * "every Saturday until Dec 1"). Null for one-off events. */
+  recurrenceId?: string;
 }
 
 export interface Todo {

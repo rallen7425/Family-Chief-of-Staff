@@ -11,8 +11,13 @@ export interface EventDraftPayload {
   familyMemberName: string | null;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm, or "" for all-day
+  endTime: string; // HH:mm, or ""
   location: string;
   notes: string;
+  /** YYYY-MM-DD, or "" for a one-off event. Set only once the user has said
+   * how long a recurring pattern ("every Saturday") should run — the model
+   * is instructed to ask rather than guess when that's still unknown. */
+  recurrenceUntil: string;
 }
 
 export interface TodoDraftPayload {

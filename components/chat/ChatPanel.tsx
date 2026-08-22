@@ -97,8 +97,11 @@ export function ChatPanel({ familyMembers }: ChatPanelProps) {
                     familyMemberId: draft.familyMemberId ?? "",
                     date: draft.date,
                     time: draft.time,
+                    endTime: draft.endTime,
                     location: draft.location,
                     notes: draft.notes,
+                    repeatsWeekly: Boolean(draft.recurrenceUntil),
+                    repeatUntil: draft.recurrenceUntil,
                   }}
                   submitLabel="Add to Schedule"
                   onSubmit={(input) =>

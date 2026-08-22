@@ -24,6 +24,7 @@ export interface EventRow {
   status: ItemStatus;
   source_type: SourceType;
   source_detail: SourceDetail | null;
+  recurrence_id: string | null;
 }
 
 export interface TodoRow {
