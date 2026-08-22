@@ -275,4 +275,19 @@ production Supabase, `/api/chat` answers correctly with live citations, and
 `/api/pipeline/gmail-scan` correctly deduped 24 already-scanned messages and processed 1
 genuinely new one that had arrived in the inbox since the last local test run.
 
+User confirmed `APP_URL` corrected and manually ran the `gmail-scan` GitHub Actions
+workflow via the Actions tab — green checkmark, confirming the cron trigger, repo
+secret/variable, and production route are all correctly wired end-to-end. The 2-hour
+cron now runs unattended.
+
 **All 8 phases of the original implementation plan are now complete.**
+
+## Known follow-ups (not yet scheduled)
+
+- Today screen's "Keep in Mind" review list has no cap — with real email-scan volume
+  (23 items on first real run) it scrolls a long way. Deferred per the user — revisit
+  once day-to-day use makes clear what layout actually helps (cap + "review all" link,
+  vs. a dedicated review screen).
+- Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per
+  the original plan's explicit MVP scope cut).
+- "Message" tab is still just a placeholder (future family-to-family messaging).
