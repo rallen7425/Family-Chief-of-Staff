@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getMemberEmailDomains } from "@/lib/data/memberEmailDomains";
 import { getGmailClient } from "./gmail/client";
 import { listRecentMessageIds, fetchMessageDetail } from "./gmail/fetchMessages";
 import { fetchAttachmentBuffer } from "./gmail/fetchAttachments";
@@ -22,6 +23,14 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
   const supabase = getSupabaseClient();
   const gmail = await getGmailClient();
   const familyMembers = await getFamilyMembers();
+  const emailDomains = await getMemberEmailDomains();
+
+  const { data: gmailCreds } = await supabase
+    .from("gmail_credentials")
+    .select("google_account_email")
+    .eq("id", 1)
+    .maybeSingle();
+  const googleAccountEmail = gmailCreds?.google_account_email ?? null;
 
   const messageIds = await listRecentMessageIds(gmail);
 
@@ -83,8 +92,11 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
           threadId: message.threadId,
           sender: message.sender,
           subject: message.subject,
+          receivedAt: message.receivedAt,
+          googleAccountEmail,
         },
-        familyMembers
+        familyMembers,
+        emailDomains
       );
 
       await supabase.from("email_scan_log").insert({

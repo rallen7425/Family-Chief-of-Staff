@@ -38,6 +38,7 @@ export interface EventInput {
 function revalidateScheduleViews() {
   revalidatePath("/schedule");
   revalidatePath("/");
+  revalidatePath("/review");
 }
 
 function generateWeeklyDates(firstDate: string, untilDate: string): string[] {
@@ -157,7 +158,10 @@ export async function updateEvent(
       all_day: input.allDay,
       location: input.location?.trim() || null,
       notes: input.notes?.trim() || null,
-      status: "confirmed",
+      // Deliberately not touching `status` here — editing a field is a
+      // correction, not a review decision. A pending-review item stays
+      // pending (confirmEvent/dismissEvent own that transition), and an
+      // already-confirmed event stays confirmed.
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

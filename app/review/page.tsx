@@ -39,6 +39,7 @@ function eventToItem(event: CalendarEvent, familyMembers: FamilyMember[]): Revie
       : format(new Date(event.startsAt), "EEE, MMM d 'at' h:mm a"),
     location: event.location,
     personName: personName(event.familyMemberId, familyMembers),
+    fullEvent: event,
   };
 }
 
@@ -77,7 +78,7 @@ export default async function ReviewPage() {
           <p className="text-[14px] text-muted-label">Nothing waiting for review.</p>
         </section>
       ) : (
-        <ReviewList groups={groupList} />
+        <ReviewList groups={groupList} familyMembers={familyMembers} />
       )}
     </>
   );

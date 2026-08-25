@@ -6,6 +6,9 @@ export interface FamilyMember {
   id: string;
   name: string;
   accentColor: AccentColor;
+  /** Drives computed event visibility (see lib/visibility.ts) — adults'
+   * assigned events default to private-to-them, kids' don't. */
+  isAdult: boolean;
 }
 
 export interface SourceDetail {
@@ -18,6 +21,10 @@ export interface SourceDetail {
   attachmentName?: string;
   attachmentPage?: number;
   extractedSnippet?: string;
+  /** ISO datetime the source email was received (email_scan only). */
+  receivedAt?: string;
+  /** The connected Gmail mailbox this was scanned from (email_scan only). */
+  googleAccountEmail?: string;
 }
 
 export interface CalendarEvent {
@@ -36,6 +43,7 @@ export interface CalendarEvent {
   /** Shared across every row generated from one recurring-event input (e.g.
    * "every Saturday until Dec 1"). Null for one-off events. */
   recurrenceId?: string;
+  createdAt: string; // ISO datetime
 }
 
 export interface Todo {

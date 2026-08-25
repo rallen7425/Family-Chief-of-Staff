@@ -184,7 +184,7 @@ export function EventForm({
       </div>
       <div>
         <label className={FORM_LABEL_CLASS} htmlFor="event-notes">
-          Notes
+          Additional details
         </label>
         <textarea
           id="event-notes"

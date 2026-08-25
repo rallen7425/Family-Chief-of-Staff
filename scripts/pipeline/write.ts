@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { householdLocalToInstant } from "@/lib/householdTime";
 import type { FamilyMember, SourceDetail } from "@/lib/types";
+import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 import type { ExtractedItem } from "./extract/extractEvents";
 
 export interface MessageMeta {
@@ -8,11 +9,35 @@ export interface MessageMeta {
   threadId: string;
   sender: string;
   subject: string;
+  receivedAt: string | null;
+  googleAccountEmail: string | null;
 }
 
-function resolvePerson(hint: string | null, familyMembers: FamilyMember[]): string | null {
-  if (!hint) return null;
-  return familyMembers.find((m) => m.name.toLowerCase() === hint.toLowerCase())?.id ?? null;
+/** Extracts the domain from a raw `From:` header value, e.g.
+ * `"Austin Prep" <mail1@veracross.com>` → `veracross.com`. */
+function extractSenderDomain(sender: string): string | null {
+  const match = sender.match(/@([\w.-]+)/);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function resolvePerson(
+  hint: string | null,
+  sender: string,
+  familyMembers: FamilyMember[],
+  emailDomains: MemberEmailDomain[]
+): string | null {
+  if (hint) {
+    const byName = familyMembers.find((m) => m.name.toLowerCase() === hint.toLowerCase());
+    if (byName) return byName.id;
+  }
+
+  // Fallback: the LLM didn't name anyone (common for a school's automated
+  // mailer addressed to parents generally), but the sender's domain is a
+  // known school domain for a specific kid.
+  const domain = extractSenderDomain(sender);
+  if (!domain) return null;
+  const rule = emailDomains.find((d) => domain === d.domain || domain.endsWith(`.${d.domain}`));
+  return rule?.familyMemberId ?? null;
 }
 
 function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail {
@@ -24,20 +49,23 @@ function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail
     attachmentName: item.attachment_name ?? undefined,
     attachmentPage: item.attachment_page ?? undefined,
     extractedSnippet: item.source_excerpt,
+    receivedAt: meta.receivedAt ?? undefined,
+    googleAccountEmail: meta.googleAccountEmail ?? undefined,
   };
 }
 
 export async function writeExtractedItems(
   items: ExtractedItem[],
   meta: MessageMeta,
-  familyMembers: FamilyMember[]
+  familyMembers: FamilyMember[],
+  emailDomains: MemberEmailDomain[]
 ): Promise<{ eventsCreated: number; todosCreated: number }> {
   const supabase = getSupabaseClient();
   let eventsCreated = 0;
   let todosCreated = 0;
 
   for (const item of items) {
-    const familyMemberId = resolvePerson(item.person_hint, familyMembers);
+    const familyMemberId = resolvePerson(item.person_hint, meta.sender, familyMembers, emailDomains);
     const sourceDetail = buildSourceDetail(item, meta);
 
     if (item.kind === "event") {

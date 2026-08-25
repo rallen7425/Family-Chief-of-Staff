@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, X, CheckCheck } from "lucide-react";
+import { Check, X, CheckCheck, Pencil } from "lucide-react";
 import { approveReviewItems, removeReviewItems, type ReviewItemRef } from "@/lib/actions/review";
+import { EventDetailsModal } from "@/components/events/EventDetailsModal";
+import type { CalendarEvent, FamilyMember } from "@/lib/types";
 
 export interface ReviewGroupItem {
   id: string;
@@ -11,6 +13,9 @@ export interface ReviewGroupItem {
   when: string;
   location?: string;
   personName?: string;
+  /** Full record, events only — lets the review row open EventDetailsModal
+   * in edit mode without a separate fetch. */
+  fullEvent?: CalendarEvent;
 }
 
 export interface ReviewGroup {
@@ -28,12 +33,13 @@ function toRefs(items: ReviewGroupItem[]): ReviewItemRef[] {
   return items.map((item) => ({ id: item.id, kind: item.kind }));
 }
 
-export function ReviewList({ groups }: { groups: ReviewGroup[] }) {
+export function ReviewList({ groups, familyMembers }: { groups: ReviewGroup[]; familyMembers: FamilyMember[] }) {
   const allKeys = groups.flatMap((group) => group.items.map(itemKey));
   // Default to everything selected — "approve all from this source" is the
   // primary flow; deselecting an item before approving is the exception.
   const [selected, setSelected] = useState<Set<string>>(new Set(allKeys));
   const [isPending, startTransition] = useTransition();
+  const [editingItem, setEditingItem] = useState<ReviewGroupItem | null>(null);
 
   function toggle(key: string) {
     setSelected((prev) => {
@@ -127,6 +133,16 @@ export function ReviewList({ groups }: { groups: ReviewGroup[] }) {
                         {item.location ? ` · ${item.location}` : ""}
                       </p>
                     </div>
+                    {item.fullEvent && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingItem(item)}
+                        aria-label="Edit"
+                        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-label hover:bg-mist hover:text-primary transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleRemove([{ id: item.id, kind: item.kind }])}
@@ -143,6 +159,17 @@ export function ReviewList({ groups }: { groups: ReviewGroup[] }) {
           </section>
         );
       })}
+
+      {editingItem?.fullEvent && (
+        <EventDetailsModal
+          key={editingItem.fullEvent.id}
+          event={editingItem.fullEvent}
+          familyMembers={familyMembers}
+          open={true}
+          onClose={() => setEditingItem(null)}
+          startInEditMode
+        />
+      )}
     </div>
   );
 }

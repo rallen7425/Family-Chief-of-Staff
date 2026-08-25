@@ -4,7 +4,7 @@ import type { FamilyMember } from "@/lib/types";
 import type { FamilyMemberRow } from "@/lib/data/dbTypes";
 
 function mapFamilyMember(row: FamilyMemberRow): FamilyMember {
-  return { id: row.id, name: row.name, accentColor: row.accent_color };
+  return { id: row.id, name: row.name, accentColor: row.accent_color, isAdult: row.is_adult };
 }
 
 /** Wrapped in React's cache() since both the root layout (for the chat

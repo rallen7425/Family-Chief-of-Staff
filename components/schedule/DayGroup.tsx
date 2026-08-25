@@ -1,6 +1,7 @@
 import { format, isSameDay } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
+import { EventRow } from "@/components/events/EventRow";
 
 interface DayGroupProps {
   date: Date;
@@ -36,20 +37,22 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
           {events.map((event) => {
             const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
             return (
-              <div key={event.id} className="flex gap-4 items-start">
-                <div className="w-14 text-[13px] text-muted-label font-medium pt-0.5 shrink-0 text-right">
-                  {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+              <EventRow key={event.id} event={event} familyMembers={familyMembers}>
+                <div className="flex gap-4 items-start">
+                  <div className="w-14 text-[13px] text-muted-label font-medium pt-0.5 shrink-0 text-right">
+                    {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+                  </div>
+                  <div
+                    className={`w-[3px] self-stretch rounded-full mt-0.5 ${
+                      member ? ACCENT_BG[member.accentColor] : "bg-border"
+                    }`}
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-[16px] text-ink leading-tight mb-0.5">{event.title}</h4>
+                    {event.location && <p className="text-[13px] text-muted-label">{event.location}</p>}
+                  </div>
                 </div>
-                <div
-                  className={`w-[3px] self-stretch rounded-full mt-0.5 ${
-                    member ? ACCENT_BG[member.accentColor] : "bg-border"
-                  }`}
-                />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-[16px] text-ink leading-tight mb-0.5">{event.title}</h4>
-                  {event.location && <p className="text-[13px] text-muted-label">{event.location}</p>}
-                </div>
-              </div>
+              </EventRow>
             );
           })}
         </div>

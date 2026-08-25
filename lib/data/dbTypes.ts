@@ -9,6 +9,7 @@ export interface FamilyMemberRow {
   accent_color: AccentColor;
   avatar_url: string | null;
   sort_order: number;
+  is_adult: boolean;
 }
 
 export interface EventRow {
@@ -25,6 +26,7 @@ export interface EventRow {
   source_type: SourceType;
   source_detail: SourceDetail | null;
   recurrence_id: string | null;
+  created_at: string;
 }
 
 export interface TodoRow {
@@ -44,4 +46,10 @@ export interface KeepInMindRow {
   icon: string | null;
   family_member_id: string | null;
   dismissed: boolean;
+}
+
+export interface MemberEmailDomainRow {
+  id: string;
+  family_member_id: string;
+  domain: string;
 }
