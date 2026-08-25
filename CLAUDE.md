@@ -18,8 +18,29 @@ fixed two real correctness bugs plus some smaller cleanup (listed below); (2) re
 all "rufus" infra naming to generic/`family_chief_of_staff` naming, since the working
 name "Rufus" was never meant to leak into infra (schema, folder, package name) — the
 chat persona name itself stays "Rufus," now driven by a single `lib/config.ts` constant
-so rebranding it later is a one-line change; (3) pushed and deployed all of the above
-together.
+so rebranding it later is a one-line change; (3) started pushing/deploying all of the
+above together, but **paused mid-way — see "BLOCKED" below, this is not live yet.**
+
+**BLOCKED (2026-08-25): PostgREST stuck project-wide, not specific to this app.**
+The schema-rename migration and `supabase config push` both applied correctly — verified
+directly against Postgres (`family_chief_of_staff` exists, `rufus` is gone, nothing else
+changed) — but the shared project's PostgREST/Data-API service came back unreachable
+afterward (503 `PGRST002`, "Could not query the database for the schema cache") across
+**every** schema, not just this app's, confirmed via `supabase services` showing
+`postgrest` as the only component with no remote version. Two `NOTIFY pgrst, 'reload
+schema'` / `'reload config'` calls sent directly to Postgres did not recover it after
+~7 minutes. No CLI or public Management API command exists to force a service restart
+(checked — it's a requested-but-unshipped feature per Supabase's own GitHub
+discussions); **the fix requires a human clicking "Restart project" in the Supabase
+dashboard** (Settings → General or the Infrastructure tab, `rocky-coast-labs` project).
+**Next session (or user) should:**
+1. Restart the project via the dashboard, then verify with:
+   `curl -s -o /dev/null -w "%{http_code}\n" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_URL/rest/v1/?select=*"`
+   (run from this repo with `.env.local` sourced) — expect `200`, not `503`.
+2. Once that's `200`: `cd ~/Documents/Claude/Projects/family-chief-of-staff && npm run build` to confirm the build succeeds against the renamed schema (it failed with `PGRST106`/schema-not-found before the rename, which is expected and fine — just needs a clean pass now).
+3. `git push` (3+1 commits already sit on local `main`, nothing on `origin/main` yet).
+4. `vercel --prod` to deploy.
+5. Verify live: Today page loads, `/schedule` with a person filter, the chat bar with a person-specific question (confirms the visibility-leak fix), `/review` renders, and the next GitHub Actions cron run succeeds against the renamed schema.
 
 **Rename details:** local repo folder moved from `~/Documents/Claude/Projects/rufus` to
 `~/Documents/Claude/Projects/family-chief-of-staff`; `package.json`/`package-lock.json`
