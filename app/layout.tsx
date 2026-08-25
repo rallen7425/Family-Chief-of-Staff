@@ -7,6 +7,7 @@ import { ChatShell } from "@/components/chat/ChatShell";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getPendingReviewEvents } from "@/lib/data/events";
 import { getPendingReviewTodos } from "@/lib/data/todos";
+import { ASSISTANT_NAME } from "@/lib/config";
 import "./globals.css";
 
 const bricolageGrotesque = Bricolage_Grotesque({
@@ -22,7 +23,7 @@ const instrumentSans = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Rufus",
+  title: ASSISTANT_NAME,
   description: "Family Chief of Staff",
 };
 

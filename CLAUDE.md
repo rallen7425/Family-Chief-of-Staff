@@ -6,23 +6,42 @@
 
 ---
 
-## Session status (paused 2026-08-24)
+## Session status (2026-08-25)
 
-All 8 build phases are complete and deployed. Since then, the user has been doing
-real-world usage testing (their own account, real Gmail inbox, real production database)
-and reporting concrete bugs/gaps one at a time, each investigated to root cause, fixed,
-verified against real data, and deployed.
+Before this session: all 8 build phases were complete and deployed, and the 2026-08-24
+session's commits (event details/history modal, review-page editing, person-detection/
+visibility) were sitting locally, never pushed to GitHub or deployed.
 
-**This session (2026-08-24) added a real feature rather than a bug fix** — an event
-details/history modal, review-page editing, and smarter person-detection/visibility —
-see the dated section below for full detail. **Not yet deployed**: committed locally in
-both this repo (`b1b5c5b`) and `rocky-coast-labs` (`7c1cc31`, the migration — already
-applied to the live shared database, that part *is* live), but this repo's commits
-haven't been pushed to GitHub (`git push`) or deployed (`vercel --prod`) yet. The
-Supabase schema change is live in production already; the app code that uses it is not.
-**Next session should push + deploy first** (after checking with the user), then resume
-from whatever they found during the still-pending hands-on review mentioned in the prior
-pause below.
+**This session:** (1) ran a full code review on those unpushed commits before shipping
+anything, per standing instruction to always clean up before proceeding — found and
+fixed two real correctness bugs plus some smaller cleanup (listed below); (2) renamed
+all "rufus" infra naming to generic/`family_chief_of_staff` naming, since the working
+name "Rufus" was never meant to leak into infra (schema, folder, package name) — the
+chat persona name itself stays "Rufus," now driven by a single `lib/config.ts` constant
+so rebranding it later is a one-line change; (3) pushed and deployed all of the above
+together.
+
+**Rename details:** local repo folder moved from `~/Documents/Claude/Projects/rufus` to
+`~/Documents/Claude/Projects/family-chief-of-staff`; `package.json`/`package-lock.json`
+name field updated; the Postgres schema in the shared `rocky-coast-labs` Supabase
+project renamed `rufus` → `family_chief_of_staff` (migration
+`rocky-coast-labs/supabase/migrations/20260825000001_rename_rufus_schema_to_family_chief_of_staff.sql`,
+`config.toml`'s exposed-schemas list, and the `_meta.apps` row all updated to match);
+`lib/supabase.ts` / `lib/data/dbTypes.ts` / `scripts/gmail/get-refresh-token.ts` updated
+to the new schema name. GitHub repo and Vercel project were already correctly named
+`Family-Chief-of-Staff` from the 2026-08-22 session below — no change needed there.
+
+**Bugs fixed from the code review:** chat's `query_schedule` tool was leaking other
+family members' events when filtered to one person (a side effect of
+`getEventsInRange`'s new visibility-based filter — correct for `/schedule`, too broad
+when reused by chat, fixed in `lib/chat/tools.ts` only); the email pipeline's
+`resolvePerson` (`scripts/pipeline/write.ts`) could misattribute an event to the wrong
+kid when the LLM named a real but non-family person from a school-domain sender, instead
+of leaving it unassigned; editing an existing event's "Repeats" checkbox silently did
+nothing since `updateEvent` never reads it — now hidden while editing
+(`EventForm`'s new `isEditing` prop); `EventDetailsModal`'s reset-on-reopen relied on an
+easy-to-forget `key`-remount convention in callers — standardized on conditional
+mounting (matches how `ReviewList` already did it).
 
 **Fixed and deployed in the 2026-08-22 session** (see the dated sections below for full detail):
 - Keep in Mind redesign (capped at 3 + "View all"), `/notifications` inbox as a real
@@ -117,7 +136,7 @@ built from is at `docs/design/IMPLEMENTATION-PLAN.md`.
 |---|---|---|
 | Framework | Next.js (App Router) | `create-next-app`, no `src/` dir |
 | Styling | Tailwind CSS v4 (CSS-first) | Tokens in `app/globals.css` `@theme` block |
-| Database | Supabase (Postgres) | Shared `rocky-coast-labs` project, schema `rufus` — **no auth**, single service-role client, no browser client |
+| Database | Supabase (Postgres) | Shared `rocky-coast-labs` project, schema `family_chief_of_staff` — **no auth**, single service-role client, no browser client |
 | AI | Anthropic Claude API | Chat (`/api/chat`, tool-use) + email-scan extraction (batched, Distilled-style) |
 | Email ingestion | Gmail API (read-only) | Single mailbox (`rallen7425@gmail.com`), OAuth refresh token stored server-side |
 | Ingestion pipeline | GitHub Actions (cron) | Calls a Vercel API route with a shared-secret header — mirrors Distilled's pipeline, avoids Vercel Pro's cron limits |
@@ -148,9 +167,10 @@ mockup happens to use Google's Material Symbols font instead, not carried forwar
 ## Data layer
 
 Supabase — the shared "Rocky Coast Labs" project (ref `kywdezqgrtpzuecxxvfc`), schema
-`rufus`. Migrations/RLS/grants live in the separate `rocky-coast-labs` repo, not here —
+`family_chief_of_staff` (renamed from `rufus` 2026-08-25 — see the dated session note
+below). Migrations/RLS/grants live in the separate `rocky-coast-labs` repo, not here —
 see its `ARCHITECTURE.md` for the platform-wide convention (one Supabase project, one
-schema per app). This app only ever queries its own `rufus` schema via `SUPABASE_URL` +
+schema per app). This app only ever queries its own `family_chief_of_staff` schema via `SUPABASE_URL` +
 `SUPABASE_SERVICE_ROLE_KEY` (server-only, never shipped to the browser) — no anon key, no
 browser Supabase client, no session/cookie handling, since there's no login concept.
 
@@ -166,7 +186,7 @@ is also surfaced to the user directly via `EventDetailsModal`'s History section,
 used internally. Auto-detected (email-scan) events/todos are inserted immediately with
 `status: 'pending_review'` — not held in a blocking queue — and surfaced as a review
 nudge on the Today screen. Person resolution (`scripts/pipeline/write.ts`) tries an exact
-name match against the roster first, then falls back to `rufus.member_email_domains`
+name match against the roster first, then falls back to `family_chief_of_staff.member_email_domains`
 (sender-domain → family member, e.g. a kid's school mailer) before giving up.
 
 ---

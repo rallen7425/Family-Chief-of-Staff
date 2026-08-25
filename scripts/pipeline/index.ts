@@ -21,16 +21,11 @@ export interface PipelineResult {
 
 export async function runGmailScanPipeline(): Promise<PipelineResult> {
   const supabase = getSupabaseClient();
-  const gmail = await getGmailClient();
-  const familyMembers = await getFamilyMembers();
-  const emailDomains = await getMemberEmailDomains();
-
-  const { data: gmailCreds } = await supabase
-    .from("gmail_credentials")
-    .select("google_account_email")
-    .eq("id", 1)
-    .maybeSingle();
-  const googleAccountEmail = gmailCreds?.google_account_email ?? null;
+  const [{ gmail, googleAccountEmail }, familyMembers, emailDomains] = await Promise.all([
+    getGmailClient(),
+    getFamilyMembers(),
+    getMemberEmailDomains(),
+  ]);
 
   const messageIds = await listRecentMessageIds(gmail);
 

@@ -21,13 +21,14 @@ export function EventRow({ event, familyMembers, children }: EventRowProps) {
       <button type="button" onClick={() => setOpen(true)} className="text-left w-full">
         {children}
       </button>
-      <EventDetailsModal
-        key={open ? "open" : "closed"}
-        event={event}
-        familyMembers={familyMembers}
-        open={open}
-        onClose={() => setOpen(false)}
-      />
+      {open && (
+        <EventDetailsModal
+          event={event}
+          familyMembers={familyMembers}
+          open={open}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }

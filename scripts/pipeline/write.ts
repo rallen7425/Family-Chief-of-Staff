@@ -20,24 +20,31 @@ function extractSenderDomain(sender: string): string | null {
   return match ? match[1].toLowerCase() : null;
 }
 
-function resolvePerson(
-  hint: string | null,
-  sender: string,
-  familyMembers: FamilyMember[],
-  emailDomains: MemberEmailDomain[]
-): string | null {
-  if (hint) {
-    const byName = familyMembers.find((m) => m.name.toLowerCase() === hint.toLowerCase());
-    if (byName) return byName.id;
-  }
-
-  // Fallback: the LLM didn't name anyone (common for a school's automated
-  // mailer addressed to parents generally), but the sender's domain is a
-  // known school domain for a specific kid.
+/** The sender's domain is a known school domain for a specific kid — used
+ * when the LLM didn't name anyone (common for a school's automated mailer
+ * addressed to parents generally). Resolved once per message, not per item,
+ * since it only depends on the constant sender address. */
+function resolveByDomain(sender: string, emailDomains: MemberEmailDomain[]): string | null {
   const domain = extractSenderDomain(sender);
   if (!domain) return null;
   const rule = emailDomains.find((d) => domain === d.domain || domain.endsWith(`.${d.domain}`));
   return rule?.familyMemberId ?? null;
+}
+
+function resolvePerson(
+  hint: string | null,
+  domainMemberId: string | null,
+  familyMembers: FamilyMember[]
+): string | null {
+  if (hint) {
+    // The LLM named someone — trust that over the domain guess. If the name
+    // isn't a family member (e.g. a teacher or coach mentioned in the body),
+    // leave it unassigned rather than silently falling back to the domain
+    // rule, which would misattribute it to a specific kid.
+    const byName = familyMembers.find((m) => m.name.toLowerCase() === hint.toLowerCase());
+    return byName ? byName.id : null;
+  }
+  return domainMemberId;
 }
 
 function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail {
@@ -61,11 +68,12 @@ export async function writeExtractedItems(
   emailDomains: MemberEmailDomain[]
 ): Promise<{ eventsCreated: number; todosCreated: number }> {
   const supabase = getSupabaseClient();
+  const domainMemberId = resolveByDomain(meta.sender, emailDomains);
   let eventsCreated = 0;
   let todosCreated = 0;
 
   for (const item of items) {
-    const familyMemberId = resolvePerson(item.person_hint, meta.sender, familyMembers, emailDomains);
+    const familyMemberId = resolvePerson(item.person_hint, domainMemberId, familyMembers);
     const sourceDetail = buildSourceDetail(item, meta);
 
     if (item.kind === "event") {

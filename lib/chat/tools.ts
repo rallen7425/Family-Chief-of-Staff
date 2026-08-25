@@ -117,7 +117,13 @@ export async function executeQuerySchedule(rawInput: unknown, familyMembers: Fam
   // letting Claude reason over the actual titles is far more reliable than
   // a naive string match, and a household's event volume is small enough
   // that this costs nothing.
-  const events = await getEventsInRange(start, end, personId);
+  //
+  // getEventsInRange's own personId filter applies the /schedule page's
+  // visibility rule (a kid's event shows under either parent's filter) —
+  // right for that page, too broad for chat, which should answer only
+  // with this person's own events. Fetch unfiltered and match strictly.
+  const allEvents = await getEventsInRange(start, end);
+  const events = person ? allEvents.filter((event) => event.familyMemberId === person.id) : allEvents;
 
   let todos: Awaited<ReturnType<typeof getTodos>> = [];
   if (input.include_todos !== false) {

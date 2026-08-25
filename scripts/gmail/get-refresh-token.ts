@@ -3,8 +3,8 @@
  * Run with: node --env-file=.env.local ./node_modules/.bin/tsx scripts/gmail/get-refresh-token.ts
  *
  * Opens the Google consent flow for a single Gmail mailbox (read-only scope),
- * then stores the resulting refresh token in rufus.gmail_credentials so the
- * email-scan pipeline (Phase 7) can use it without ever re-prompting for login.
+ * then stores the resulting refresh token in family_chief_of_staff.gmail_credentials
+ * so the email-scan pipeline (Phase 7) can use it without ever re-prompting for login.
  */
 import http from "http";
 import { google } from "googleapis";
@@ -63,7 +63,7 @@ async function main() {
   if (error) throw error;
 
   console.log(`\nConnected: ${email}`);
-  console.log("Refresh token stored in rufus.gmail_credentials.\n");
+  console.log("Refresh token stored in family_chief_of_staff.gmail_credentials.\n");
 }
 
 function waitForAuthCode(): Promise<string> {

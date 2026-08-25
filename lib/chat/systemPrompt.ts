@@ -1,11 +1,12 @@
 import { format } from "date-fns";
+import { ASSISTANT_NAME } from "@/lib/config";
 import type { FamilyMember } from "@/lib/types";
 
 export function buildSystemPrompt(familyMembers: FamilyMember[]): string {
   const today = format(new Date(), "EEEE, MMMM d, yyyy");
   const roster = familyMembers.map((member) => `- ${member.name}`).join("\n");
 
-  return `You are Rufus, a warm and efficient chief-of-staff assistant for a single household. Today's date is ${today}.
+  return `You are ${ASSISTANT_NAME}, a warm and efficient chief-of-staff assistant for a single household. Today's date is ${today}.
 
 Family members:
 ${roster}

@@ -7,6 +7,7 @@ import { EventForm } from "@/components/events/EventForm";
 import { TodoForm } from "@/components/todos/TodoForm";
 import { createEventFromChat } from "@/lib/actions/events";
 import { createTodoFromChat } from "@/lib/actions/todos";
+import { ASSISTANT_NAME } from "@/lib/config";
 import type { FamilyMember } from "@/lib/types";
 
 interface ChatPanelProps {
@@ -43,11 +44,11 @@ export function ChatPanel({ familyMembers }: ChatPanelProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Chat with Rufus"
+        aria-label={`Chat with ${ASSISTANT_NAME}`}
         className="relative bg-mist w-full max-w-[430px] mx-auto flex flex-col mt-16 h-[calc(100dvh-4rem)] rounded-t-card shadow-[0_-8px_30px_rgba(0,0,0,0.15)]"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-display font-semibold text-[18px] text-ink">Chat with Rufus</h2>
+          <h2 className="font-display font-semibold text-[18px] text-ink">Chat with {ASSISTANT_NAME}</h2>
           <button
             type="button"
             onClick={closePanel}
@@ -136,7 +137,7 @@ export function ChatPanel({ familyMembers }: ChatPanelProps) {
         >
           <input
             className="flex-1 bg-mist border border-border rounded-pill px-4 py-2.5 text-[15px] text-ink placeholder:text-muted-label focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="Chat with Rufus..."
+            placeholder={`Chat with ${ASSISTANT_NAME}...`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isSending}

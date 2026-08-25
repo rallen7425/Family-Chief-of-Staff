@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import { ASSISTANT_NAME } from "@/lib/config";
 
 export default function MessagePage() {
   return (
@@ -13,7 +14,7 @@ export default function MessagePage() {
         <h2 className="font-semibold text-[17px] text-ink">Coming soon</h2>
         <p className="text-[14px] text-muted-text leading-relaxed">
           Sending messages to other family members will live here. This is separate
-          from the &ldquo;Chat with Rufus&rdquo; bar below, which is your AI assistant.
+          from the &ldquo;Chat with {ASSISTANT_NAME}&rdquo; bar below, which is your AI assistant.
         </p>
       </section>
     </div>

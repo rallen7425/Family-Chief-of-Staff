@@ -8,6 +8,7 @@ import { EventForm, type EventFormInitialValues } from "@/components/events/Even
 import { updateEvent } from "@/lib/actions/events";
 import { describeVisibility } from "@/lib/visibility";
 import { ACCENT_BG } from "@/lib/colors";
+import { ASSISTANT_NAME } from "@/lib/config";
 import type { CalendarEvent, FamilyMember, SourceType } from "@/lib/types";
 
 interface EventDetailsModalProps {
@@ -36,14 +37,15 @@ function toInitialValues(event: CalendarEvent): EventFormInitialValues {
 
 const SOURCE_LABEL: Record<SourceType, string> = {
   manual: "Manual entry",
-  chat: "Rufus chat",
+  chat: `${ASSISTANT_NAME} chat`,
   email_scan: "Email scan",
   system: "System",
 };
 
-/** Caller must remount this on each open (e.g. `key={open ? "open" : "closed"}`)
- * so `editing` re-initializes from `startInEditMode` every time — see EventRow
- * and ReviewList, the two places this is opened from. */
+/** Callers must conditionally mount this only while `open` (rather than
+ * always rendering it with `open` toggling), so `editing` re-initializes
+ * fresh from `startInEditMode` each time it's opened — see EventRow and
+ * ReviewList, the two places this is opened from. */
 export function EventDetailsModal({
   event,
   familyMembers,
@@ -67,6 +69,7 @@ export function EventDetailsModal({
           onSubmit={(input) => updateEvent(event.id, input)}
           onSuccess={onClose}
           onCancel={() => setEditing(false)}
+          isEditing
         />
       </Modal>
     );

@@ -2,6 +2,7 @@
 
 import { Plus, Mic, AudioLines } from "lucide-react";
 import { useChat } from "@/components/chat/ChatProvider";
+import { ASSISTANT_NAME } from "@/lib/config";
 
 export function ChatBar() {
   const { inputValue, setInputValue, sendMessage, isSending, openPanel } = useChat();
@@ -27,7 +28,7 @@ export function ChatBar() {
         </button>
         <input
           className="flex-1 bg-transparent border-none p-0 text-[15px] font-medium text-ink placeholder:text-muted-label focus:ring-0 focus:outline-none"
-          placeholder="Chat with Rufus..."
+          placeholder={`Chat with ${ASSISTANT_NAME}...`}
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}

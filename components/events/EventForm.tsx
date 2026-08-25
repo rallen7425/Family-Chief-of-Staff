@@ -24,6 +24,11 @@ interface EventFormProps {
   onSubmit: (input: EventInput) => Promise<{ error?: string }>;
   onSuccess: () => void;
   onCancel: () => void;
+  /** Hides the "Repeats" recurrence controls — updateEvent doesn't support
+   * turning an existing single event into a recurring series, so showing
+   * them while editing lets the user "save" a setting that silently does
+   * nothing. Only the create-new-event callers should leave this false. */
+  isEditing?: boolean;
 }
 
 export function EventForm({
@@ -33,6 +38,7 @@ export function EventForm({
   onSubmit,
   onSuccess,
   onCancel,
+  isEditing = false,
 }: EventFormProps) {
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [familyMemberId, setFamilyMemberId] = useState(initialValues?.familyMemberId ?? "");
@@ -194,21 +200,23 @@ export function EventForm({
           placeholder="Optional"
         />
       </div>
-      <div>
-        <label className={FORM_LABEL_CLASS} htmlFor="event-repeats">
-          Repeats
-        </label>
-        <select
-          id="event-repeats"
-          className={FORM_INPUT_CLASS}
-          value={repeatsWeekly ? "weekly" : "none"}
-          onChange={(e) => setRepeatsWeekly(e.target.value === "weekly")}
-        >
-          <option value="none">Does not repeat</option>
-          <option value="weekly">Weekly</option>
-        </select>
-      </div>
-      {repeatsWeekly && (
+      {!isEditing && (
+        <div>
+          <label className={FORM_LABEL_CLASS} htmlFor="event-repeats">
+            Repeats
+          </label>
+          <select
+            id="event-repeats"
+            className={FORM_INPUT_CLASS}
+            value={repeatsWeekly ? "weekly" : "none"}
+            onChange={(e) => setRepeatsWeekly(e.target.value === "weekly")}
+          >
+            <option value="none">Does not repeat</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+      )}
+      {!isEditing && repeatsWeekly && (
         <div>
           <label className={FORM_LABEL_CLASS} htmlFor="event-repeat-until">
             Until

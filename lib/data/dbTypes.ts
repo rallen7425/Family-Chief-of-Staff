@@ -1,7 +1,7 @@
 import type { AccentColor, ItemStatus, SourceDetail, SourceType } from "@/lib/types";
 
-/** Row shapes as they come back from Supabase (snake_case) — see the `rufus`
- * schema migration in rocky-coast-labs/supabase/migrations/. */
+/** Row shapes as they come back from Supabase (snake_case) — see the
+ * `family_chief_of_staff` schema migration in rocky-coast-labs/supabase/migrations/. */
 
 export interface FamilyMemberRow {
   id: string;
