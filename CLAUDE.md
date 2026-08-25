@@ -12,54 +12,43 @@ Before this session: all 8 build phases were complete and deployed, and the 2026
 session's commits (event details/history modal, review-page editing, person-detection/
 visibility) were sitting locally, never pushed to GitHub or deployed.
 
-**This session:** (1) ran a full code review on those unpushed commits before shipping
-anything, per standing instruction to always clean up before proceeding — found and
-fixed two real correctness bugs plus some smaller cleanup (listed below); (2) renamed
-all "rufus" infra naming to generic/`family_chief_of_staff` naming, since the working
-name "Rufus" was never meant to leak into infra (schema, folder, package name) — the
-chat persona name itself stays "Rufus," now driven by a single `lib/config.ts` constant
-so rebranding it later is a one-line change; (3) started pushing/deploying all of the
-above together, but **paused mid-way — see "BLOCKED" below, this is not live yet.**
+**This session:** (1) ran a full code review on the 2026-08-24 session's unpushed
+commits before shipping anything, per standing instruction to always clean up before
+proceeding — found and fixed three real correctness bugs plus some smaller cleanup
+(listed below); (2) renamed all "rufus" infra naming to generic/`family_chief_of_staff`
+naming, since the working name "Rufus" was never meant to leak into infra (schema,
+folder, package name) — the chat persona name itself stays "Rufus," now driven by a
+single `lib/config.ts` constant so rebranding it later is a one-line change; (3) hit and
+resolved a serious Supabase platform outage along the way (full incident below); (4)
+pushed and deployed everything — **this is all live now.**
 
-**BLOCKED (2026-08-25): confirmed Supabase-side config-propagation bug, project-wide,
-not specific to this app — needs a Supabase support ticket, not more self-service fixes.**
+**Incident (resolved 2026-08-25): Supabase project-wide PostgREST outage during the
+schema rename, unrelated to a config mistake on our side.** The schema-rename migration
+and `supabase config push` both applied correctly — verified directly against Postgres
+(`family_chief_of_staff` exists, `rufus` is gone) — but the shared project's
+PostgREST/Data-API service never picked up the new config, returning 503 `PGRST002`
+project-wide (every app on the shared `rocky-coast-labs` Supabase project, not just this
+one). PostgREST's own logs showed it stuck booting with the **old** pre-rename schema
+list (`"schema \"rufus\" does not exist"`, `3F000`) despite the stored config already
+being correct. A full "Restart project" cycle didn't fix it either — same error
+afterward. Filed a Supabase support ticket (`SU-454805`, free plan, no SLA); their first
+suggested cause (an `authenticator` role-level `pgrst.db_schemas` override) was checked
+and ruled out — no such override existed anywhere. **What actually fixed it: Pause
+project, then Resume/Restore** (Settings → General) — a full reprovision, not just a
+restart-in-place of the same stuck container. Confirmed via direct `curl` against the
+REST API and PostgREST logs before declaring it fixed. Lesson for any future Supabase
+outage on this shared project: **try Pause+Restore before waiting on support**,
+especially on the free tier where ticket response isn't guaranteed.
 
-The schema-rename migration and `supabase config push` both applied correctly —
-verified directly against Postgres (`family_chief_of_staff` exists, `rufus` is gone) and
-via `supabase config push` reporting "up to date" (checked twice). But the shared
-project's PostgREST/Data-API service never picked up the new config. Full diagnostic
-chain, in order:
-1. Immediately after the rename: REST API returned 503 `PGRST002` ("Could not query the
-   database for the schema cache") across **every** schema in the project, not just this
-   app's — confirmed via `supabase services` showing `postgrest` as the only component
-   with no remote version.
-2. Two `NOTIFY pgrst, 'reload schema'` / `'reload config'` calls sent directly to
-   Postgres did not recover it.
-3. Read PostgREST's own logs directly (dashboard → Logs, filter Log Type = PostgREST) —
-   found the real error: `Failed to load the schema cache using
-   db-schemas=public,graphql_public,sonicradar,_meta,distilled,village_summer,pm_rearchitected,rufus
-   ... "schema \"rufus\" does not exist"`. It's still booting with the **old**
-   pre-rename schema list even though the stored config is already correct.
-4. Used the dashboard's **Settings → General → "Restart project"** control (the correct
-   self-service path — confirmed there is no CLI/Management API equivalent, checked
-   Supabase's own GitHub discussions) and waited for the full restart cycle to complete.
-5. **Restart did not fix it** — checked PostgREST logs again ~10 minutes after the
-   restart finished: identical error, identical stale schema list including `rufus`.
-
-This also lines up with an active "API Gateway: Degraded Performance" entry and an
-unresolved incident on status.supabase.com at the time (JWT/401 fix rollout scheduled
-"starting Monday," which was 2026-08-25) — plausibly the same rollout broke config
-propagation for this project. **Self-service options are exhausted.** Next step is a
-Supabase support ticket for project ref `kywdezqgrtpzuecxxvfc`, citing the exact log
-line above and that a full restart didn't clear it.
-
-**Once Supabase resolves it, resume with:**
-1. Verify: `curl -s -o /dev/null -w "%{http_code}\n" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_URL/rest/v1/?select=*"`
-   (run from this repo with `.env.local` sourced) — expect `200`, not `503`.
-2. `cd ~/Documents/Claude/Projects/family-chief-of-staff && npm run build` to confirm the build succeeds against the renamed schema.
-3. `git push` (5 commits already sit on local `main`, nothing on `origin/main` yet).
-4. `vercel --prod` to deploy.
-5. Verify live: Today page loads, `/schedule` with a person filter, the chat bar with a person-specific question (confirms the visibility-leak fix), `/review` renders, and the next GitHub Actions cron run succeeds against the renamed schema.
+**Verified live post-deploy:** Today page renders real data (Keep in Mind items,
+32 pending review entries queued up from while the API was down), page title/chat bar
+correctly say "Rufus" via the new `ASSISTANT_NAME` constant, and `/schedule`, `/review`,
+`/todo`, `/notifications`, `/message` all return 200. **Not yet manually verified:** the
+`/schedule` person-filter behavior and a person-specific chat question in the live
+UI (the underlying fixes were code-reviewed and are deployed, just not click-tested
+live) — worth a quick check next time the app is open. The 32-item review backlog is
+also worth a look — likely just Gmail-pipeline output that queued up during the outage,
+not a new problem.
 
 **Rename details:** local repo folder moved from `~/Documents/Claude/Projects/rufus` to
 `~/Documents/Claude/Projects/family-chief-of-staff`; `package.json`/`package-lock.json`
