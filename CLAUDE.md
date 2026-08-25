@@ -6,17 +6,25 @@
 
 ---
 
-## Session status (paused 2026-08-22)
+## Session status (paused 2026-08-24)
 
 All 8 build phases are complete and deployed. Since then, the user has been doing
 real-world usage testing (their own account, real Gmail inbox, real production database)
 and reporting concrete bugs/gaps one at a time, each investigated to root cause, fixed,
-verified against real data, and deployed. Session paused here while the user does a
-hands-on functional review; no specific area was flagged going in — next session should
-start by asking what they found, rather than assuming any of the items below still need
-work.
+verified against real data, and deployed.
 
-**Fixed and deployed this session** (see the dated sections below for full detail):
+**This session (2026-08-24) added a real feature rather than a bug fix** — an event
+details/history modal, review-page editing, and smarter person-detection/visibility —
+see the dated section below for full detail. **Not yet deployed**: committed locally in
+both this repo (`b1b5c5b`) and `rocky-coast-labs` (`7c1cc31`, the migration — already
+applied to the live shared database, that part *is* live), but this repo's commits
+haven't been pushed to GitHub (`git push`) or deployed (`vercel --prod`) yet. The
+Supabase schema change is live in production already; the app code that uses it is not.
+**Next session should push + deploy first** (after checking with the user), then resume
+from whatever they found during the still-pending hands-on review mentioned in the prior
+pause below.
+
+**Fixed and deployed in the 2026-08-22 session** (see the dated sections below for full detail):
 - Keep in Mind redesign (capped at 3 + "View all"), `/notifications` inbox as a real
   page between the bell and `/review`, `/review` page redesigned with grouping/checkbox
   select/per-group+global approve/remove.
@@ -146,15 +154,20 @@ schema per app). This app only ever queries its own `rufus` schema via `SUPABASE
 `SUPABASE_SERVICE_ROLE_KEY` (server-only, never shipped to the browser) — no anon key, no
 browser Supabase client, no session/cookie handling, since there's no login concept.
 
-**Family roster (seeded):** Rick (Dad, coral) · Kim (Mom, teal) · Ben (gold) · Nora
-(berry). A future onboarding/user-management flow will let colors be reassigned or
-repeated.
+**Family roster (seeded):** Rick (Dad, coral, adult) · Kim (Mom, teal, adult) · Ben
+(gold, kid) · Nora (berry, kid). The `is_adult` flag (added 2026-08-24) drives computed
+event visibility — see `lib/visibility.ts`. A future onboarding/user-management flow
+will let colors be reassigned or repeated.
 
 **Event/todo provenance:** every row stores `source_type` (`manual` | `chat` |
 `email_scan`) and `source_detail` (jsonb) so the user can trace where information came
-from, and so the chat can cite sources when answering questions. Auto-detected
-(email-scan) events/todos are inserted immediately with `status: 'pending_review'` — not
-held in a blocking queue — and surfaced as a review nudge on the Today screen.
+from, and so the chat can cite sources when answering questions — since 2026-08-24 this
+is also surfaced to the user directly via `EventDetailsModal`'s History section, not just
+used internally. Auto-detected (email-scan) events/todos are inserted immediately with
+`status: 'pending_review'` — not held in a blocking queue — and surfaced as a review
+nudge on the Today screen. Person resolution (`scripts/pipeline/write.ts`) tries an exact
+name match against the roster first, then falls back to `rufus.member_email_domains`
+(sender-domain → family member, e.g. a kid's school mailer) before giving up.
 
 ---
 
@@ -541,13 +554,80 @@ tooling has no real on-screen keyboard to trigger the resize) — this is the do
 standard fix for the failure mode described, but worth the user confirming it feels
 right on an actual phone.
 
+## Event details/history modal, review-page editing, smarter visibility (2026-08-24)
+
+The user asked for a proper details view on events (click to see full context and how
+an item got onto the calendar), an edit affordance on the review page, and smarter
+person-detection so a kid's school email reliably lands on the right kid and an adult's
+personal appointment doesn't show up on everyone's calendar. Investigation found the
+data model already had most of what was needed — `source_type`/`source_detail` jsonb
+provenance and a `pending_review` status existed from Phase 2 on — it just wasn't
+surfaced or editable in any UI. New work:
+
+- **`components/events/EventDetailsModal.tsx`** (opened via new **`EventRow.tsx`**,
+  swapped into `DayGroup.tsx`'s and `ScheduleCard.tsx`'s per-event rendering) — title,
+  time, location, "Additional context" (the existing `notes` field, relabeled from
+  "Notes" on the manual-entry form), a computed **"Visible to: …"** line, and a
+  collapsed-by-default `<details>` History section: source, "Added by: Household" (no
+  per-user identity exists in this app yet — deliberately not inventing one), date
+  added (`events.created_at`, newly surfaced in the TS types), and for `email_scan`
+  specifically: sender, received date, subject, attachment name, and the extracted
+  snippet that justified the item. For `chat`-originated events, shows the original
+  message (already captured since Phase 5, just never displayed anywhere before).
+- **Edit, from either the details modal or a new pencil icon on `/review` rows**
+  (`ReviewList.tsx` now receives full `CalendarEvent` records, not just the
+  display-only projection it used before). This is powered by a real bug fix: `updateEvent`
+  used to hard-reset `status` to `"confirmed"` on every save, which silently approved
+  anything edited from the review queue and — per the "Known follow-ups" entry this
+  removes below — made it impossible to edit an already-confirmed event without
+  side effects. It now leaves `status` untouched, so editing is a pure correction.
+- **Person detection**: new `rufus.member_email_domains` table (migration
+  `20260824000001_rufus_history_and_visibility.sql` in `rocky-coast-labs`, already
+  pushed to the live shared database) gives `resolvePerson()` in
+  `scripts/pipeline/write.ts` a sender-domain fallback for when the LLM's `person_hint`
+  comes back null — seeded from real domains already seen in this inbox
+  (`austinprep.org`/`veracross.com` → Nora, `stjohnsprep.org` → Ben), not guessed.
+- **Visibility**: new `is_adult` column on `family_members` (Rick/Kim `true`, Ben/Nora
+  `false`) drives a computed rule in new `lib/visibility.ts` — an adult's own event is
+  private to them, a kid's event is visible to that kid plus every adult (not the other
+  kid), a whole-family event (no assignee) is visible to everyone. There's no login in
+  this app, so there's no real "current viewer" to enforce this against in the default,
+  unfiltered household view — it stays unfiltered, exactly as before. Enforcement is
+  layered onto the **existing person-filter** instead (`getEventsInRange` in
+  `lib/data/events.ts`): filtering the schedule to one person now applies the
+  visibility rule rather than a strict assignee match. Verified live: filtering to Kim
+  hides Rick's private events and vice versa; a kid's event shows under either parent's
+  filter.
+
+Verified end-to-end against the real production database (not synthetic data): edited a
+real pending `email_scan` item's notes through the new review-page Edit button, confirmed
+it stayed `pending_review` and the edit persisted, then reverted the test edit back to
+its original text; opened a real confirmed event's History and confirmed real sender/
+subject/attachment/snippet provenance renders correctly; confirmed the domain-fallback
+matching logic against real sender addresses already in `email_scan_log`. All temporary
+test artifacts were cleaned up — no leftover rows or scratch files.
+
+**Not yet backfilled**: `sourceDetail.receivedAt`/`googleAccountEmail` are new fields the
+email-scan pipeline now writes going forward, but the ~30 items already sitting in
+`pending_review` from before this change won't have them until they're re-scanned (dedupe
+means they won't be automatically) — their History section will just omit those two
+lines, which the modal already handles gracefully (conditional rendering, not a bug).
+
 ## Known follow-ups (not yet scheduled)
 
 - Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per
   the original plan's explicit MVP scope cut).
 - "Message" tab is still just a placeholder (future family-to-family messaging).
-- No way to edit an already-confirmed event/todo's details through the UI (surfaced
-  when the Leader Training events needed a manual person reassignment) — only
-  create-new and the pending-review approve/edit/remove flow exist today.
 - Cross-email duplicate detection (an original + a "reminder" email describing the same
   real event) isn't handled within the current per-message extraction design.
+- Todos don't have an edit affordance or a "history"/context view like events now do
+  (todos also don't have a `notes`/`location` column at all yet) — the 2026-08-24 work
+  was scoped to events only, per what was actually asked for.
+- "Added by: Household" in the new History section is a static label, not real
+  per-person attribution — there's no user-identity concept in this app yet. Real
+  attribution should come with actual user management/profile-switching, not a
+  standalone `added_by` column bolted on ahead of it.
+- The new visibility rule (adult-private vs. kid-shared) is only enforced when the
+  schedule is filtered to a specific person — the default unfiltered "All" view still
+  shows everything to everyone, since there's no real "current viewer" to enforce
+  privacy against without a login concept.
