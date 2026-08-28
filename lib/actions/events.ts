@@ -83,6 +83,22 @@ export async function updateEvent(
   return {};
 }
 
+/** Hard-deletes an event. Distinct from dismissEvent (which sets
+ * status='dismissed' to take a pending-review item out of the queue while
+ * keeping the row): this is the user explicitly removing something from the
+ * calendar for good. Closes the "no way to delete an event" gap.
+ *
+ * Deliberately does NOT revalidate here: the caller (DeleteEntrySection)
+ * shows a "deleted" confirmation step, and an immediate revalidate would
+ * unmount the modal's host row mid-flow. The client calls router.refresh()
+ * once the user dismisses the confirmation. */
+export async function deleteEvent(id: string): Promise<{ error?: string }> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from("events").delete().eq("id", id);
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function confirmEvent(id: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase

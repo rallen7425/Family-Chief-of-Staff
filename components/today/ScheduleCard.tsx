@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Filter } from "lucide-react";
+import { Filter, Info } from "lucide-react";
 import { format, isToday, isTomorrow } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
@@ -33,6 +33,7 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
       {events.length === 0 && <p className="text-[14px] text-muted-label">Nothing coming up.</p>}
       <div className="flex flex-col gap-6">
         {events.map((event) => {
+          const isAdvisory = event.kind === "advisory";
           const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
           const startDate = new Date(event.startsAt);
           // This preview shows the next few *upcoming* events, not strictly
@@ -52,11 +53,18 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
                 </div>
                 <div
                   className={`w-[3px] self-stretch rounded-full mt-1 ${
-                    member ? ACCENT_BG[member.accentColor] : "bg-border"
+                    isAdvisory ? "bg-border" : member ? ACCENT_BG[member.accentColor] : "bg-border"
                   }`}
                 />
                 <div className="flex-1 pb-2">
-                  <h3 className="font-semibold text-[17px] text-ink leading-tight mb-1">{event.title}</h3>
+                  {isAdvisory ? (
+                    <p className="flex items-center gap-1.5 text-[15px] text-muted-text leading-tight">
+                      <Info size={14} className="shrink-0 text-muted-label" />
+                      {event.title}
+                    </p>
+                  ) : (
+                    <h3 className="font-semibold text-[17px] text-ink leading-tight mb-1">{event.title}</h3>
+                  )}
                   {event.location && <p className="text-[14px] text-muted-label">{event.location}</p>}
                 </div>
               </div>

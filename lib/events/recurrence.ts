@@ -1,6 +1,6 @@
 import { addWeeks, format, parse } from "date-fns";
 import { householdLocalToInstant } from "@/lib/householdTime";
-import type { SourceDetail, SourceType } from "@/lib/types";
+import type { EntryKind, SourceDetail, SourceType } from "@/lib/types";
 
 export interface EventRecurrence {
   /** First occurrence's local date (YYYY-MM-DD) — the rest are generated
@@ -19,6 +19,9 @@ export interface EventRecurrence {
 
 export interface EventInput {
   title: string;
+  /** Omitted = "event". Advisory entries are visually distinct on the
+   * calendar (muted, no person color) and default to whole-household. */
+  kind?: EntryKind;
   familyMemberId: string | null;
   startsAt: string; // ISO — computed client-side so the browser's local timezone
   // resolves the wall-clock time correctly, since a Vercel server's default
@@ -33,6 +36,7 @@ export interface EventInput {
 
 export interface EventRowInsert {
   title: string;
+  kind: EntryKind;
   family_member_id: string | null;
   all_day: boolean;
   location: string | null;
@@ -79,6 +83,7 @@ export function buildEventRows({
 }: BuildRowsOptions): EventRowInsert[] {
   const base = {
     title,
+    kind: input.kind ?? "event",
     family_member_id: input.familyMemberId,
     all_day: input.allDay,
     location: input.location?.trim() || null,

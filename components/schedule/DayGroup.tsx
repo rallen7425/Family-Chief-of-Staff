@@ -2,6 +2,7 @@ import { format, isSameDay } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
+import { AdvisorySummary } from "@/components/schedule/AdvisorySummary";
 
 interface DayGroupProps {
   date: Date;
@@ -13,6 +14,8 @@ interface DayGroupProps {
 export function DayGroup({ date, events, familyMembers, showDateHeader = true }: DayGroupProps) {
   const memberById = new Map(familyMembers.map((member) => [member.id, member]));
   const isToday = isSameDay(date, new Date());
+  const advisories = events.filter((event) => event.kind === "advisory");
+  const timedEvents = events.filter((event) => event.kind !== "advisory");
 
   return (
     <div>
@@ -30,11 +33,12 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
           </span>
         </div>
       )}
+      <AdvisorySummary advisories={advisories} familyMembers={familyMembers} />
       {events.length === 0 ? (
         <p className="text-[14px] text-muted-label pb-4">No events</p>
-      ) : (
+      ) : timedEvents.length === 0 ? null : (
         <div className="flex flex-col gap-5 pb-2">
-          {events.map((event) => {
+          {timedEvents.map((event) => {
             const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
             return (
               <EventRow key={event.id} event={event} familyMembers={familyMembers}>

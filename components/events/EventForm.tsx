@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { FamilyMember } from "@/lib/types";
+import type { EntryKind, FamilyMember } from "@/lib/types";
 import type { EventInput } from "@/lib/events/recurrence";
 import { FORM_INPUT_CLASS, FORM_LABEL_CLASS } from "@/components/shared/formStyles";
+import { DatePickerButton } from "@/components/shared/DatePickerButton";
+import { TimePickerButton } from "@/components/shared/TimePickerButton";
 
 export interface EventFormInitialValues {
   title: string;
+  kind?: EntryKind;
   familyMemberId: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm, or "" for all-day
@@ -41,6 +44,7 @@ export function EventForm({
   isEditing = false,
 }: EventFormProps) {
   const [title, setTitle] = useState(initialValues?.title ?? "");
+  const [kind, setKind] = useState<EntryKind>(initialValues?.kind ?? "event");
   const [familyMemberId, setFamilyMemberId] = useState(initialValues?.familyMemberId ?? "");
   const [date, setDate] = useState(initialValues?.date ?? "");
   const [time, setTime] = useState(initialValues?.time ?? "");
@@ -51,6 +55,11 @@ export function EventForm({
   const [repeatUntil, setRepeatUntil] = useState(initialValues?.repeatUntil ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Kind is fixed once created (P0: no re-typing after creation). Advisories
+  // are always whole-household, so the Person control is hidden for them.
+  const isAdvisory = kind === "advisory";
+  const showKindSelector = !isEditing;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,13 +87,14 @@ export function EventForm({
     startTransition(async () => {
       const result = await onSubmit({
         title,
-        familyMemberId: familyMemberId || null,
+        kind,
+        familyMemberId: isAdvisory ? null : familyMemberId || null,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt?.toISOString(),
         allDay: !time,
         location,
         notes,
-        recurrence: repeatsWeekly
+        recurrence: repeatsWeekly && !isAdvisory
           ? {
               localDate: date,
               localStartTime: time || undefined,
@@ -103,6 +113,33 @@ export function EventForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {showKindSelector && (
+        <div>
+          <label className={FORM_LABEL_CLASS}>Type</label>
+          <div className="flex gap-2">
+            {(["event", "advisory"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`flex-1 py-2 rounded-pill text-[14px] font-semibold capitalize transition-colors ${
+                  kind === k
+                    ? "bg-primary text-white"
+                    : "bg-mist text-muted-text border border-border hover:bg-border/40"
+                }`}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          {isAdvisory && (
+            <p className="text-[12px] text-muted-label mt-1.5">
+              A heads-up for the whole household (e.g. a road closure) — shown on the schedule but visually
+              set apart from real events.
+            </p>
+          )}
+        </div>
+      )}
       <div>
         <label className={FORM_LABEL_CLASS} htmlFor="event-title">
           Title
@@ -112,52 +149,47 @@ export function EventForm({
           className={FORM_INPUT_CLASS}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Soccer practice"
+          placeholder={isAdvisory ? "e.g. Main St lane closure" : "e.g. Soccer practice"}
         />
       </div>
-      <div>
-        <label className={FORM_LABEL_CLASS} htmlFor="event-person">
-          Person
-        </label>
-        <select
-          id="event-person"
-          className={FORM_INPUT_CLASS}
-          value={familyMemberId}
-          onChange={(e) => setFamilyMemberId(e.target.value)}
-        >
-          <option value="">Whole family</option>
-          {familyMembers.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!isAdvisory && (
+        <div>
+          <label className={FORM_LABEL_CLASS} htmlFor="event-person">
+            Person
+          </label>
+          <select
+            id="event-person"
+            className={FORM_INPUT_CLASS}
+            value={familyMemberId}
+            onChange={(e) => setFamilyMemberId(e.target.value)}
+          >
+            <option value="">Whole family</option>
+            {familyMembers.map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={FORM_LABEL_CLASS} htmlFor="event-date">
             Date
           </label>
-          <input
-            id="event-date"
-            type="date"
-            className={FORM_INPUT_CLASS}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+          <DatePickerButton id="event-date" value={date} onChange={setDate} />
         </div>
         <div>
           <label className={FORM_LABEL_CLASS} htmlFor="event-time">
             Time (optional)
           </label>
-          <input
+          <TimePickerButton
             id="event-time"
-            type="time"
-            className={FORM_INPUT_CLASS}
             value={time}
-            onChange={(e) => {
-              setTime(e.target.value);
-              if (!e.target.value) setEndTime("");
+            placeholder="All day"
+            onChange={(v) => {
+              setTime(v);
+              if (!v) setEndTime("");
             }}
           />
         </div>
@@ -167,13 +199,7 @@ export function EventForm({
           <label className={FORM_LABEL_CLASS} htmlFor="event-end-time">
             End time (optional)
           </label>
-          <input
-            id="event-end-time"
-            type="time"
-            className={FORM_INPUT_CLASS}
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
+          <TimePickerButton id="event-end-time" value={endTime} onChange={setEndTime} placeholder="Optional" />
         </div>
       )}
       <div>
@@ -200,7 +226,7 @@ export function EventForm({
           placeholder="Optional"
         />
       </div>
-      {!isEditing && (
+      {!isEditing && !isAdvisory && (
         <div>
           <label className={FORM_LABEL_CLASS} htmlFor="event-repeats">
             Repeats
@@ -216,17 +242,15 @@ export function EventForm({
           </select>
         </div>
       )}
-      {!isEditing && repeatsWeekly && (
+      {!isEditing && !isAdvisory && repeatsWeekly && (
         <div>
           <label className={FORM_LABEL_CLASS} htmlFor="event-repeat-until">
             Until
           </label>
-          <input
+          <DatePickerButton
             id="event-repeat-until"
-            type="date"
-            className={FORM_INPUT_CLASS}
             value={repeatUntil}
-            onChange={(e) => setRepeatUntil(e.target.value)}
+            onChange={setRepeatUntil}
             min={date || undefined}
           />
         </div>
@@ -245,7 +269,7 @@ export function EventForm({
           disabled={isPending}
           className="flex-1 py-3 rounded-input bg-primary hover:bg-primary-hover text-white font-semibold text-[15px] transition-colors disabled:opacity-60"
         >
-          {isPending ? "Saving…" : submitLabel}
+          {isPending ? "Saving…" : !isEditing && isAdvisory ? "Add Advisory" : submitLabel}
         </button>
       </div>
     </form>

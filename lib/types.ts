@@ -2,6 +2,11 @@ export type AccentColor = "coral" | "teal" | "gold" | "berry";
 export type SourceType = "manual" | "chat" | "email_scan" | "system";
 export type ItemStatus = "pending_review" | "confirmed" | "dismissed";
 
+/** P0 introduces `advisory` alongside `event` on the calendar. P1 widens
+ * this to the full unified set (event | task | reminder | advisory) when
+ * `events` + `todos` merge into one `entries` table. */
+export type EntryKind = "event" | "advisory";
+
 export interface FamilyMember {
   id: string;
   name: string;
@@ -30,6 +35,7 @@ export interface SourceDetail {
 export interface CalendarEvent {
   id: string;
   title: string;
+  kind: EntryKind;
   familyMemberId: string | null;
   category?: string;
   startsAt: string; // ISO datetime

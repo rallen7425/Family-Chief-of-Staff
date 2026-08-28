@@ -9,6 +9,7 @@ function mapEvent(row: EventRow): CalendarEvent {
   return {
     id: row.id,
     title: row.title,
+    kind: row.kind ?? "event",
     familyMemberId: row.family_member_id,
     category: row.category ?? undefined,
     startsAt: row.starts_at,

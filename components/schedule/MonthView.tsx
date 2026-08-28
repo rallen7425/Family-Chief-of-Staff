@@ -40,6 +40,8 @@ export function MonthView({ month, events, familyMembers, buildDayHref }: MonthV
       <div className="grid grid-cols-7 gap-y-1">
         {days.map((day) => {
           const dayEvents = events.filter((event) => isSameDay(new Date(event.startsAt), day));
+          const realEvents = dayEvents.filter((event) => event.kind !== "advisory");
+          const hasAdvisory = dayEvents.some((event) => event.kind === "advisory");
           const inMonth = isSameMonth(day, month);
           const isToday = isSameDay(day, today);
 
@@ -60,8 +62,8 @@ export function MonthView({ month, events, familyMembers, buildDayHref }: MonthV
               >
                 {format(day, "d")}
               </span>
-              <div className="flex gap-0.5 h-1.5">
-                {dayEvents.slice(0, 3).map((event) => {
+              <div className="flex gap-0.5 h-1.5 items-center">
+                {realEvents.slice(0, 3).map((event) => {
                   const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
                   return (
                     <span
@@ -70,6 +72,9 @@ export function MonthView({ month, events, familyMembers, buildDayHref }: MonthV
                     />
                   );
                 })}
+                {hasAdvisory && (
+                  <span className="w-1.5 h-1.5 rounded-full border border-muted-label" aria-label="Advisory" />
+                )}
               </div>
             </Link>
           );

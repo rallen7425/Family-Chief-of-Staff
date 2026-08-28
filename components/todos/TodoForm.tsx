@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { FamilyMember } from "@/lib/types";
 import type { TodoInput } from "@/lib/actions/todos";
 import { FORM_INPUT_CLASS, FORM_LABEL_CLASS } from "@/components/shared/formStyles";
+import { DatePickerButton } from "@/components/shared/DatePickerButton";
 
 export interface TodoFormInitialValues {
   title: string;
@@ -93,13 +94,7 @@ export function TodoForm({
         <label className={FORM_LABEL_CLASS} htmlFor="todo-due">
           Due date
         </label>
-        <input
-          id="todo-due"
-          type="date"
-          className={FORM_INPUT_CLASS}
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-        />
+        <DatePickerButton id="todo-due" value={dueDate} onChange={setDueDate} placeholder="Optional" />
       </div>
       {error && <p className="text-[13px] text-accent-berry font-medium">{error}</p>}
       <div className="flex gap-3 mt-2">

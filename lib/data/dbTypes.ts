@@ -1,4 +1,4 @@
-import type { AccentColor, ItemStatus, SourceDetail, SourceType } from "@/lib/types";
+import type { AccentColor, EntryKind, ItemStatus, SourceDetail, SourceType } from "@/lib/types";
 
 /** Row shapes as they come back from Supabase (snake_case) — see the
  * `family_chief_of_staff` schema migration in rocky-coast-labs/supabase/migrations/. */
@@ -15,6 +15,7 @@ export interface FamilyMemberRow {
 export interface EventRow {
   id: string;
   title: string;
+  kind: EntryKind;
   family_member_id: string | null;
   category: string | null;
   starts_at: string;
