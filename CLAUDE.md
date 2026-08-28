@@ -23,21 +23,20 @@ better role modeling, arrival-time intelligence, plus a routing-API travel-buffe
 conflict feature deferred to a later phase. Phased P0 → P1 → P1.5 → P2, review
 after each.
 
-### State right now — LOCAL ONLY, NOT DEPLOYED
+### State right now — DEPLOYED to production, commits NOT pushed
 
 | | |
 |---|---|
-| **Commits** | `family-chief-of-staff`: `f70165e` (P0), `a4d8966` (P1a), `3a90baf` (P1b) — **not pushed**. `rocky-coast-labs`: `c3b9f49` (P0 migration), `a388e16` (P1a migration) — **not pushed**. |
-| **Migrations** | `20260828000002_family_chief_of_staff_entry_kind.sql` + `20260828000003_family_chief_of_staff_entries.sql` — **already applied to the shared DB** via `supabase db push` (verified with smoke scripts). |
-| **Production** | still runs the **pre-redesign code**, reading/writing the old `events`/`todos` tables. |
-| **Checks** | `tsc` / `eslint` / `next build` / `npm test` (61) all green locally. |
+| **Commits** | `family-chief-of-staff`: `f70165e` (P0), `a4d8966` (P1a), `3a90baf` (P1b), `23f9eb6` (this status) — **not pushed to GitHub**. `rocky-coast-labs`: `c3b9f49` (P0 migration), `a388e16` (P1a migration) — **not pushed**. |
+| **Migrations** | `20260828000002_family_chief_of_staff_entry_kind.sql` + `20260828000003_family_chief_of_staff_entries.sql` — applied to the shared DB via `supabase db push` (verified with smoke scripts). |
+| **Production** | **P0+P1 deployed 2026-08-28** via `vercel --prod` from the local tree (deployment `dpl_HCk9U1BocnvcWZbKmhn6jYsyvNfv`). Verified: all routes 200 incl. new `/settings`, `/api/*` guards 405, `/schedule` + `/settings` render real `entries`-backed data. Divergence check pre-deploy: 0 `events`/`todos` rows missing from `entries` (nothing was created on prod after the migration). |
+| **Checks** | `tsc` / `eslint` / `next build` / `npm test` (61) all green. |
 
-**Divergence risk:** the shared DB schema is ahead of deployed prod. The old
-`events` (67 rows) / `todos` (26 rows) tables are **left in place as a rollback
-net** — a follow-up migration drops them once P1 is deployed and verified. But
-the new app writes only to `entries`, so anything created on the live site
-*after* the migrations went in lands in the old tables and won't surface once the
-new code deploys. Reconcile before `vercel --prod` if the site was used today.
+**Still open:** (1) `git push` both repos to `origin/main` — the deploy went
+straight from the local working tree, GitHub is behind. (2) The old `events` (67
+rows) / `todos` (26 rows) tables remain as a rollback net; drop them with a small
+`rocky-coast-labs` migration now that P1 is live and verified. The deployed app
+writes only to `entries`, so those tables are frozen/orphan from here on.
 
 ### How the DB password worked this session
 
