@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { householdLocalToInstant } from "@/lib/householdTime";
-import type { FamilyMember, SourceDetail } from "@/lib/types";
+import { inferArrivalAt, type ArrivalBufferRule } from "@/lib/arrival";
+import type { EntryKind, FamilyMember, SourceDetail } from "@/lib/types";
 import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 import type { ExtractedItem } from "./extract/extractEvents";
 
@@ -61,11 +62,16 @@ function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail
   };
 }
 
+/** event / advisory / reminder land on the schedule (need a date); task
+ * is deadline-style (date optional). */
+const SCHEDULE_KINDS: EntryKind[] = ["event", "advisory", "reminder"];
+
 export async function writeExtractedItems(
   items: ExtractedItem[],
   meta: MessageMeta,
   familyMembers: FamilyMember[],
-  emailDomains: MemberEmailDomain[]
+  emailDomains: MemberEmailDomain[],
+  arrivalRules: ArrivalBufferRule[]
 ): Promise<{ eventsCreated: number; todosCreated: number }> {
   const supabase = getSupabaseClient();
   const domainMemberId = resolveByDomain(meta.sender, emailDomains);
@@ -73,43 +79,80 @@ export async function writeExtractedItems(
   let todosCreated = 0;
 
   for (const item of items) {
-    const familyMemberId = resolvePerson(item.person_hint, domainMemberId, familyMembers);
+    const subjectId = resolvePerson(item.person_hint, domainMemberId, familyMembers);
+    const subject = familyMembers.find((m) => m.id === subjectId);
     const sourceDetail = buildSourceDetail(item, meta);
+    const kind = item.kind;
 
-    if (item.kind === "event") {
-      if (!item.date) continue; // an event with no date isn't useful on the calendar
-      const { error } = await supabase.from("entries").insert({
-        kind: "event",
-        title: item.title,
-        subject_member_id: familyMemberId,
-        starts_at: householdLocalToInstant(item.date, item.time),
-        is_all_day: !item.time,
-        location_text: item.location,
-        notes: item.notes,
-        busy_status: "busy",
-        scope: "family",
-        status: "pending_review",
-        source_type: "email_scan",
-        source_detail: sourceDetail,
-      });
-      if (error) throw error;
-      eventsCreated++;
-    } else {
-      const { error } = await supabase.from("entries").insert({
-        kind: "task",
-        title: item.title,
-        subject_member_id: familyMemberId,
-        due_at: item.date,
-        is_all_day: false,
-        busy_status: "free",
-        scope: "family",
-        status: "pending_review",
-        source_type: "email_scan",
-        source_detail: sourceDetail,
-      });
-      if (error) throw error;
-      todosCreated++;
+    // Advisories are a household concept, never pinned to one person.
+    const subjectMemberId = kind === "advisory" ? null : subjectId;
+    const onSchedule = SCHEDULE_KINDS.includes(kind);
+
+    if (onSchedule && !item.date) continue; // no date → not useful on the calendar
+
+    const startsAt = onSchedule && item.date ? householdLocalToInstant(item.date, item.time) : null;
+    const endsAt =
+      startsAt && item.end_time ? householdLocalToInstant(item.date!, item.end_time) : null;
+
+    let arrivalAt: string | null = null;
+    let arrivalSource: "stated" | "inferred" | null = null;
+    if (kind === "event" && item.date) {
+      if (item.arrival_time) {
+        arrivalAt = householdLocalToInstant(item.date, item.arrival_time);
+        arrivalSource = "stated";
+      } else {
+        const inferred = inferArrivalAt(
+          {
+            kind,
+            startsAt,
+            category: item.category,
+            subjectMemberId,
+            subjectIsAdult: subject?.isAdult ?? false,
+          },
+          arrivalRules
+        );
+        if (inferred) {
+          arrivalAt = inferred;
+          arrivalSource = "inferred";
+        }
+      }
     }
+
+    const { data, error } = await supabase
+      .from("entries")
+      .insert({
+        kind,
+        title: item.title,
+        subject_member_id: subjectMemberId,
+        category: item.category,
+        starts_at: startsAt,
+        ends_at: endsAt,
+        due_at: kind === "task" ? item.date : null,
+        is_all_day: onSchedule ? !item.time : false,
+        location_text: kind === "task" ? null : item.location,
+        notes: item.notes,
+        arrival_at: arrivalAt,
+        arrival_source: arrivalSource,
+        busy_status: kind === "event" ? "busy" : "free",
+        scope: subject?.isAdult ? "personal" : "family",
+        status: "pending_review",
+        source_type: "email_scan",
+        source_detail: sourceDetail,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    // Default owner: the subject, for kid-subject (family-scoped) entries.
+    if (data && subjectMemberId && !subject?.isAdult) {
+      const { error: ownerErr } = await supabase
+        .from("entry_owners")
+        .insert({ entry_id: data.id, family_member_id: subjectMemberId });
+      if (ownerErr) throw ownerErr;
+    }
+
+    if (kind === "task") todosCreated++;
+    else eventsCreated++;
   }
 
   return { eventsCreated, todosCreated };

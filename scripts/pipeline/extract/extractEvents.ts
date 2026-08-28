@@ -7,7 +7,11 @@ import type { FamilyMember } from "@/lib/types";
 const client = new Anthropic();
 
 const ExtractedItemSchema = z.object({
-  kind: z.enum(["event", "todo"]),
+  kind: z
+    .enum(["event", "task", "reminder", "advisory"])
+    .describe(
+      "event = something on the calendar (a game, appointment). task = an action item with a deadline (return a form). reminder = a small note tied to a date or an event (bring a water bottle). advisory = a non-personal heads-up affecting the household (a road closure, allow-extra-travel-time notice)."
+    ),
   title: z.string(),
   person_hint: z.string().nullable().describe("Exact family member name if mentioned, else null"),
   date: z
@@ -17,9 +21,21 @@ const ExtractedItemSchema = z.object({
   time: z
     .string()
     .nullable()
-    .describe("24-hour HH:mm start time — events only, only if a specific time is mentioned"),
-  location: z.string().nullable(),
-  notes: z.string().nullable(),
+    .describe("24-hour HH:mm start time — events/advisories only, only if a specific time is mentioned"),
+  end_time: z
+    .string()
+    .nullable()
+    .describe("24-hour HH:mm end time — only when the text states an end time or a duration from a stated start (e.g. 'practice 4:00-6:30pm'). Put this in the structured field, not in notes."),
+  arrival_time: z
+    .string()
+    .nullable()
+    .describe("24-hour HH:mm — an explicit 'players report by', 'arrive by', 'doors open', 'call time' etc. stated in the text. Null if none is stated (a default is applied elsewhere, not here)."),
+  category: z
+    .enum(["game", "practice", "rehearsal", "appointment", "other"])
+    .nullable()
+    .describe("Classify events/reminders into this fixed vocabulary. Null for tasks/advisories or when genuinely unclear."),
+  location: z.string().nullable().describe("A place name or address, when stated. Put it here, not in notes."),
+  notes: z.string().nullable().describe("Anything relevant that doesn't fit a structured field above."),
   source_excerpt: z.string().describe("The exact quoted snippet that justifies this item"),
   source: z.enum(["body", "attachment"]),
   attachment_name: z.string().nullable(),
@@ -82,13 +98,21 @@ export async function extractItemsFromMessage(
   const response = await client.messages.parse({
     model: "claude-opus-5",
     max_tokens: 4096,
-    system: `You extract calendar events and todo items from a family's email (body text and any attachments). Family members: ${roster}.
+    system: `You extract structured entries from a family's email (body text and any attachments). Family members: ${roster}.
 
-First, decide if this email is personal to the family — school, sports/activities, medical, a friend or relative, a service the family actually uses (e.g. a photo order, a permission slip). If it's marketing, a cold sales pitch, a newsletter, a promotional "offer expires" / "sale ends" message, or bulk/automated mail unrelated to the family's real life, extract nothing and return an empty items array — a countdown on a sales offer is not a family todo, even though it has a date.
+First, decide if this email is personal to the family — school, sports/activities, medical, a friend or relative, a service the family actually uses (e.g. a photo order, a permission slip). If it's marketing, a cold sales pitch, a newsletter, a promotional "offer expires" / "sale ends" message, or bulk/automated mail unrelated to the family's real life, extract nothing and return an empty items array — a countdown on a sales offer is not a family task, even though it has a date.
 
-Only extract items with a concrete, determinable date — a game, appointment, deadline, permission-slip due date, etc. Skip vague mentions with no date. The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text in the email. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
+Choose a "kind" per item:
+- event: something that happens on the calendar at a date (a game, a practice, an appointment, a school ceremony).
+- task: an action someone must do by a deadline (return a signed form, order spirit wear, submit a physical).
+- reminder: a small note tied to a date or to an event (bring a large water bottle, wear chapel dress).
+- advisory: a non-personal heads-up that affects getting around (a road/lane closure, "allow extra travel time", a construction notice). Advisories are about the household generally, not one person.
 
-If a roster member's name is mentioned or clearly implied, set person_hint to their exact name; otherwise null (whole family). For every item, quote the exact source_excerpt that justifies it, and record whether it came from the email body or a specific attachment (and page, for PDFs) so a person can verify where the information came from.`,
+Only extract items with a concrete, determinable date. Skip vague mentions with no date. The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
+
+Put stated facts in their structured fields, not in notes: an end time goes in end_time, a place in location, a "report by"/"doors open"/"call time" in arrival_time, and classify the activity into category. Do NOT compute a default arrival time — only fill arrival_time when the text explicitly states one.
+
+If a roster member's name is mentioned or clearly implied, set person_hint to their exact name; otherwise null. For every item, quote the exact source_excerpt that justifies it, and record whether it came from the email body or a specific attachment (and page, for PDFs).`,
     messages: [{ role: "user", content: buildPrompt(message) }],
     output_config: { format: zodOutputFormat(ExtractionResultSchema) },
   });

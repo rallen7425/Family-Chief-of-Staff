@@ -4,12 +4,18 @@ import { format } from "date-fns";
 import type { Todo } from "@/lib/types";
 import type { EntryRow } from "@/lib/data/dbTypes";
 
-function mapTodo(row: EntryRow): Todo {
+type EntryRowWithOwners = EntryRow & { entry_owners: { family_member_id: string }[] | null };
+
+const SELECT_WITH_OWNERS = "*, entry_owners(family_member_id)";
+
+function mapTodo(row: EntryRowWithOwners): Todo {
   return {
     id: row.id,
     title: row.title,
     familyMemberId: row.subject_member_id,
+    ownerMemberIds: (row.entry_owners ?? []).map((o) => o.family_member_id),
     dueDate: row.due_at ?? undefined,
+    notes: row.notes ?? undefined,
     completed: row.completed_at != null,
     status: row.status,
     sourceType: row.source_type,
@@ -19,11 +25,15 @@ function mapTodo(row: EntryRow): Todo {
 
 export async function getTodos(personId?: string | null): Promise<Todo[]> {
   const supabase = getSupabaseClient();
-  let query = supabase.from("entries").select("*").eq("kind", "task").order("created_at");
+  let query = supabase
+    .from("entries")
+    .select(SELECT_WITH_OWNERS)
+    .eq("kind", "task")
+    .order("created_at");
   if (personId && personId !== "all") {
     query = query.eq("subject_member_id", personId);
   }
-  const { data, error } = await query.returns<EntryRow[]>();
+  const { data, error } = await query.returns<EntryRowWithOwners[]>();
   if (error) throw error;
   return data.map(mapTodo);
 }
@@ -32,12 +42,12 @@ export async function getIncompleteTodos(limit: number): Promise<Todo[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
-    .select("*")
+    .select(SELECT_WITH_OWNERS)
     .eq("kind", "task")
     .is("completed_at", null)
     .order("created_at")
     .limit(limit)
-    .returns<EntryRow[]>();
+    .returns<EntryRowWithOwners[]>();
   if (error) throw error;
   return data.map(mapTodo);
 }
@@ -51,14 +61,14 @@ export const getUrgentTodos = cache(async (): Promise<Todo[]> => {
   const today = format(new Date(), "yyyy-MM-dd");
   const { data, error } = await supabase
     .from("entries")
-    .select("*")
+    .select(SELECT_WITH_OWNERS)
     .eq("kind", "task")
     .is("completed_at", null)
     .neq("status", "dismissed")
     .not("due_at", "is", null)
     .lte("due_at", today)
     .order("due_at")
-    .returns<EntryRow[]>();
+    .returns<EntryRowWithOwners[]>();
   if (error) throw error;
   return data.map(mapTodo);
 });
@@ -67,11 +77,11 @@ export const getPendingReviewTodos = cache(async (): Promise<Todo[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
-    .select("*")
+    .select(SELECT_WITH_OWNERS)
     .eq("kind", "task")
     .eq("status", "pending_review")
     .order("created_at")
-    .returns<EntryRow[]>();
+    .returns<EntryRowWithOwners[]>();
   if (error) throw error;
   return data.map(mapTodo);
 });

@@ -5,37 +5,30 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { Modal } from "@/components/shared/Modal";
-import { EventForm, type EventFormInitialValues } from "@/components/events/EventForm";
-import { deleteEvent, updateEvent } from "@/lib/actions/events";
+import { EntryForm, type EntryFormInitialValues, type LinkableEntry } from "@/components/entries/EntryForm";
+import { updateEntry, deleteEntry } from "@/lib/actions/entries";
 import { describeVisibility } from "@/lib/visibility";
 import { ACCENT_BG } from "@/lib/colors";
 import { ASSISTANT_NAME } from "@/lib/config";
+import type { ArrivalBufferRule } from "@/lib/arrival";
 import type { CalendarEvent, FamilyMember, SourceType } from "@/lib/types";
 
-interface EventDetailsModalProps {
+interface EntryDetailsModalProps {
   event: CalendarEvent;
   familyMembers: FamilyMember[];
+  arrivalRules: ArrivalBufferRule[];
+  linkables?: LinkableEntry[];
   open: boolean;
   onClose: () => void;
-  /** Opens straight into edit mode (e.g. the review page's Edit action)
-   * instead of the default view-first behavior. */
   startInEditMode?: boolean;
 }
 
-function toInitialValues(event: CalendarEvent): EventFormInitialValues {
-  const start = new Date(event.startsAt);
-  const end = event.endsAt ? new Date(event.endsAt) : undefined;
-  return {
-    title: event.title,
-    kind: event.kind,
-    familyMemberId: event.familyMemberId ?? "",
-    date: format(start, "yyyy-MM-dd"),
-    time: event.allDay ? "" : format(start, "HH:mm"),
-    endTime: end ? format(end, "HH:mm") : undefined,
-    location: event.location ?? "",
-    notes: event.notes ?? "",
-  };
-}
+const KIND_LABEL: Record<string, string> = {
+  event: "Event",
+  task: "Task",
+  reminder: "Reminder",
+  advisory: "Advisory",
+};
 
 const SOURCE_LABEL: Record<SourceType, string> = {
   manual: "Manual entry",
@@ -44,20 +37,32 @@ const SOURCE_LABEL: Record<SourceType, string> = {
   system: "System",
 };
 
-/** Callers must conditionally mount this only while `open` (rather than
- * always rendering it with `open` toggling), so `editing` re-initializes
- * fresh from `startInEditMode` each time it's opened — see EventRow and
- * ReviewList, the two places this is opened from. */
-/** Delete affordance for edit mode: idle text-link -> inline confirm ->
- * end-state that replaces the whole modal body. Deliberately no native
- * confirm() dialog (blocks the event loop, feels foreign). */
-function DeleteEntrySection({
-  event,
-  onDeleted,
-}: {
-  event: CalendarEvent;
-  onDeleted: () => void;
-}) {
+function toInitialValues(event: CalendarEvent): EntryFormInitialValues {
+  const start = new Date(event.startsAt);
+  const end = event.endsAt ? new Date(event.endsAt) : undefined;
+  const date = event.kind === "task" ? event.dueDate ?? "" : format(start, "yyyy-MM-dd");
+  return {
+    kind: event.kind,
+    title: event.title,
+    subjectMemberId: event.familyMemberId ?? "",
+    ownerMemberIds: event.ownerMemberIds,
+    category: event.category ?? "",
+    date,
+    endDate: event.kind === "advisory" && end ? format(end, "yyyy-MM-dd") : "",
+    time: event.allDay ? "" : format(start, "HH:mm"),
+    endTime: end && !event.allDay && event.kind === "event" ? format(end, "HH:mm") : "",
+    arrivalTime: event.arrivalAt ? format(new Date(event.arrivalAt), "HH:mm") : "",
+    arrivalSource: event.arrivalSource ?? "",
+    busyStatus: event.busyStatus,
+    location: event.location ?? "",
+    notes: event.notes ?? "",
+    linkedEntryId: event.linkedEntryId ?? "",
+    repeatsWeekly: false,
+    repeatUntil: "",
+  };
+}
+
+function DeleteEntrySection({ event, onDeleted }: { event: CalendarEvent; onDeleted: () => void }) {
   const [state, setState] = useState<"idle" | "confirming">("idle");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -65,11 +70,8 @@ function DeleteEntrySection({
   function handleConfirm() {
     setError(null);
     startTransition(async () => {
-      const result = await deleteEvent(event.id);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
+      const result = await deleteEntry(event.id);
+      if (result.error) return setError(result.error);
       onDeleted();
     });
   }
@@ -113,27 +115,28 @@ function DeleteEntrySection({
   );
 }
 
-export function EventDetailsModal({
+/** Mount only while `open` so `editing` re-initializes from
+ * `startInEditMode` each time it's opened (see EventRow / ReviewList). */
+export function EntryDetailsModal({
   event,
   familyMembers,
+  arrivalRules,
+  linkables = [],
   open,
   onClose,
   startInEditMode = false,
-}: EventDetailsModalProps) {
+}: EntryDetailsModalProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(startInEditMode);
   const [deleted, setDeleted] = useState(false);
 
+  const member = event.familyMemberId ? familyMembers.find((m) => m.id === event.familyMemberId) : undefined;
+  const isAdvisory = event.kind === "advisory";
+
   function closeAfterDelete() {
-    // deleteEvent skips its own revalidate so this confirmation can render;
-    // refresh now that the user has seen it, to drop the row from the list.
     router.refresh();
     onClose();
   }
-
-  const member = event.familyMemberId
-    ? familyMembers.find((m) => m.id === event.familyMemberId)
-    : undefined;
 
   if (deleted) {
     return (
@@ -160,16 +163,17 @@ export function EventDetailsModal({
 
   if (editing) {
     return (
-      <Modal open={open} onClose={onClose} title={event.kind === "advisory" ? "Edit advisory" : "Edit event"}>
+      <Modal open={open} onClose={onClose} title={`Edit ${KIND_LABEL[event.kind].toLowerCase()}`}>
         <div className="flex flex-col gap-4">
-          <EventForm
+          <EntryForm
+            mode="edit"
             familyMembers={familyMembers}
+            arrivalRules={arrivalRules}
+            linkables={linkables}
             initialValues={toInitialValues(event)}
-            submitLabel="Save"
-            onSubmit={(input) => updateEvent(event.id, input)}
+            onSubmit={(input) => updateEntry(event.id, input)}
             onSuccess={onClose}
             onCancel={() => setEditing(false)}
-            isEditing
           />
           <div className="border-t border-border pt-3 flex flex-col">
             <DeleteEntrySection event={event} onDeleted={() => setDeleted(true)} />
@@ -180,27 +184,33 @@ export function EventDetailsModal({
   }
 
   const start = new Date(event.startsAt);
-  const whenLabel = event.allDay
-    ? format(start, "EEEE, MMMM d, yyyy") + " (all day)"
-    : format(start, "EEEE, MMMM d, yyyy 'at' h:mm a");
+  const whenLabel =
+    event.kind === "task"
+      ? event.dueDate
+        ? `Due ${format(new Date(`${event.dueDate}T00:00:00`), "EEEE, MMMM d, yyyy")}`
+        : "No due date"
+      : event.allDay
+        ? format(start, "EEEE, MMMM d, yyyy") + " (all day)"
+        : format(start, "EEEE, MMMM d, yyyy 'at' h:mm a");
+  const rangeEnd = isAdvisory && event.endsAt ? new Date(event.endsAt) : undefined;
+  const ownerNames = event.ownerMemberIds
+    .map((id) => familyMembers.find((m) => m.id === id)?.name)
+    .filter(Boolean) as string[];
+  const arrival = event.arrivalAt ? new Date(event.arrivalAt) : undefined;
 
   return (
     <Modal open={open} onClose={onClose} title={event.title}>
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-              member ? ACCENT_BG[member.accentColor] : "bg-border"
-            }`}
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${member ? ACCENT_BG[member.accentColor] : "bg-border"}`}
           />
           <span className="text-[14px] text-muted-text">
-            {event.kind === "advisory" ? "Household advisory" : member ? member.name : "Whole family"}
+            {isAdvisory ? "Household advisory" : member ? member.name : "Whole family"}
           </span>
-          {event.kind === "advisory" && (
-            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-mist text-muted-label border border-border">
-              Advisory
-            </span>
-          )}
+          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-mist text-muted-label border border-border">
+            {KIND_LABEL[event.kind]}
+          </span>
           {event.status === "pending_review" && (
             <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-accent-gold/15 text-accent-gold">
               Pending review
@@ -208,22 +218,47 @@ export function EventDetailsModal({
           )}
         </div>
 
+        {ownerNames.length > 0 && (
+          <p className="text-[13px] text-muted-label">
+            Owner: <span className="text-ink font-medium">{ownerNames.join(", ")}</span>
+          </p>
+        )}
+
         <div>
-          <p className="text-[15px] text-ink font-medium">{whenLabel}</p>
+          <p className="text-[15px] text-ink font-medium">
+            {whenLabel}
+            {rangeEnd && ` – ${format(rangeEnd, "EEEE, MMMM d, yyyy")}`}
+          </p>
           {event.location && <p className="text-[14px] text-muted-label mt-0.5">{event.location}</p>}
+          {arrival && (
+            <span
+              className={`inline-block mt-1.5 text-[12px] font-medium px-2 py-0.5 rounded ${
+                event.arrivalSource === "manual" || event.arrivalSource === "stated"
+                  ? "bg-[#EEF2FB] text-[#3B6FE5]"
+                  : "bg-[#F3EEF9] text-[#7C5CBF]"
+              }`}
+            >
+              Arrive {format(arrival, "h:mm a")}
+              {event.arrivalSource === "inferred" ? " · auto" : event.arrivalSource === "stated" ? " · from email" : ""}
+            </span>
+          )}
         </div>
+
+        {event.category && (
+          <p className="text-[13px] text-muted-label">
+            Category: <span className="text-ink font-medium capitalize">{event.category}</span>
+          </p>
+        )}
 
         {event.notes && (
           <div>
-            <h3 className="text-[12px] font-bold uppercase tracking-wide text-muted-label mb-1">
-              Additional context
-            </h3>
+            <h3 className="text-[12px] font-bold uppercase tracking-wide text-muted-label mb-1">Additional context</h3>
             <p className="text-[14px] text-ink whitespace-pre-wrap">{event.notes}</p>
           </div>
         )}
 
         <p className="text-[13px] text-muted-label">
-          Visible to: <span className="text-ink font-medium">{describeVisibility(event, familyMembers)}</span>
+          Visible to: <span className="text-ink font-medium">{describeVisibility({ familyMemberId: event.familyMemberId }, familyMembers)}</span>
         </p>
 
         <details className="group border-t border-border pt-3">
@@ -240,12 +275,6 @@ export function EventDetailsModal({
               <span className="text-muted-label">Added by: </span>
               <span className="text-ink">Household</span>
             </p>
-            {event.sourceDetail?.googleAccountEmail && (
-              <p>
-                <span className="text-muted-label">Account: </span>
-                <span className="text-ink">{event.sourceDetail.googleAccountEmail}</span>
-              </p>
-            )}
             <p>
               <span className="text-muted-label">Date added: </span>
               <span className="text-ink">{format(new Date(event.createdAt), "MMM d, yyyy 'at' h:mm a")}</span>
@@ -256,14 +285,6 @@ export function EventDetailsModal({
                   <p>
                     <span className="text-muted-label">Sender: </span>
                     <span className="text-ink">{event.sourceDetail.sender}</span>
-                  </p>
-                )}
-                {event.sourceDetail.receivedAt && (
-                  <p>
-                    <span className="text-muted-label">Received: </span>
-                    <span className="text-ink">
-                      {format(new Date(event.sourceDetail.receivedAt), "MMM d, yyyy 'at' h:mm a")}
-                    </span>
                   </p>
                 )}
                 {event.sourceDetail.subject && (

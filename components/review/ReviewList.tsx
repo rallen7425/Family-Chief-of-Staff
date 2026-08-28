@@ -3,19 +3,20 @@
 import { useState, useTransition } from "react";
 import { Check, X, CheckCheck, Pencil } from "lucide-react";
 import { approveReviewItems, removeReviewItems, type ReviewItemRef } from "@/lib/actions/review";
-import { EventDetailsModal } from "@/components/events/EventDetailsModal";
-import type { CalendarEvent, FamilyMember } from "@/lib/types";
+import { EntryDetailsModal } from "@/components/entries/EntryDetailsModal";
+import type { LinkableEntry } from "@/components/entries/EntryForm";
+import type { ArrivalBufferRule } from "@/lib/arrival";
+import type { CalendarEvent, EntryKind, FamilyMember } from "@/lib/types";
 
 export interface ReviewGroupItem {
   id: string;
-  kind: "event" | "todo";
+  entryKind: EntryKind;
   title: string;
   when: string;
   location?: string;
   personName?: string;
-  /** Full record, events only — lets the review row open EventDetailsModal
-   * in edit mode without a separate fetch. */
-  fullEvent?: CalendarEvent;
+  /** Full record — every kind is editable inline via EntryDetailsModal. */
+  fullEvent: CalendarEvent;
 }
 
 export interface ReviewGroup {
@@ -25,18 +26,33 @@ export interface ReviewGroup {
   items: ReviewGroupItem[];
 }
 
+const KIND_BADGE: Record<EntryKind, string> = {
+  event: "bg-primary/10 text-primary",
+  reminder: "bg-[#F3EEF9] text-[#7C5CBF]",
+  task: "bg-accent-teal/15 text-accent-teal",
+  advisory: "bg-mist text-muted-label border border-border",
+};
+
 function itemKey(item: ReviewGroupItem): string {
-  return `${item.kind}:${item.id}`;
+  return `${item.entryKind}:${item.id}`;
 }
 
 function toRefs(items: ReviewGroupItem[]): ReviewItemRef[] {
-  return items.map((item) => ({ id: item.id, kind: item.kind }));
+  return items.map((item) => ({ id: item.id, kind: item.entryKind }));
 }
 
-export function ReviewList({ groups, familyMembers }: { groups: ReviewGroup[]; familyMembers: FamilyMember[] }) {
+export function ReviewList({
+  groups,
+  familyMembers,
+  arrivalRules,
+  linkables = [],
+}: {
+  groups: ReviewGroup[];
+  familyMembers: FamilyMember[];
+  arrivalRules: ArrivalBufferRule[];
+  linkables?: LinkableEntry[];
+}) {
   const allKeys = groups.flatMap((group) => group.items.map(itemKey));
-  // Default to everything selected — "approve all from this source" is the
-  // primary flow; deselecting an item before approving is the exception.
   const [selected, setSelected] = useState<Set<string>>(new Set(allKeys));
   const [isPending, startTransition] = useTransition();
   const [editingItem, setEditingItem] = useState<ReviewGroupItem | null>(null);
@@ -119,11 +135,9 @@ export function ReviewList({ groups, familyMembers }: { groups: ReviewGroup[]; f
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
-                            item.kind === "event" ? "bg-primary/10 text-primary" : "bg-accent-gold/15 text-accent-gold"
-                          }`}
+                          className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${KIND_BADGE[item.entryKind]}`}
                         >
-                          {item.kind}
+                          {item.entryKind}
                         </span>
                         {item.personName && <span className="text-[12px] text-muted-label">{item.personName}</span>}
                       </div>
@@ -133,19 +147,17 @@ export function ReviewList({ groups, familyMembers }: { groups: ReviewGroup[]; f
                         {item.location ? ` · ${item.location}` : ""}
                       </p>
                     </div>
-                    {item.fullEvent && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingItem(item)}
-                        aria-label="Edit"
-                        className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-label hover:bg-mist hover:text-primary transition-colors"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
                     <button
                       type="button"
-                      onClick={() => handleRemove([{ id: item.id, kind: item.kind }])}
+                      onClick={() => setEditingItem(item)}
+                      aria-label="Edit"
+                      className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-label hover:bg-mist hover:text-primary transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove([{ id: item.id, kind: item.entryKind }])}
                       disabled={isPending}
                       aria-label="Remove"
                       className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-muted-label hover:bg-mist hover:text-accent-berry transition-colors disabled:opacity-40"
@@ -160,11 +172,13 @@ export function ReviewList({ groups, familyMembers }: { groups: ReviewGroup[]; f
         );
       })}
 
-      {editingItem?.fullEvent && (
-        <EventDetailsModal
+      {editingItem && (
+        <EntryDetailsModal
           key={editingItem.fullEvent.id}
           event={editingItem.fullEvent}
           familyMembers={familyMembers}
+          arrivalRules={arrivalRules}
+          linkables={linkables}
           open={true}
           onClose={() => setEditingItem(null)}
           startInEditMode

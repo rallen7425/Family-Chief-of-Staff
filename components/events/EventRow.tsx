@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { EventDetailsModal } from "@/components/events/EventDetailsModal";
+import { EntryDetailsModal } from "@/components/entries/EntryDetailsModal";
+import { useEntryEditing } from "@/components/entries/EntryEditingContext";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 
 interface EventRowProps {
@@ -10,11 +11,12 @@ interface EventRowProps {
   children: React.ReactNode;
 }
 
-/** Wraps an event's existing visual row markup in a click target that opens
- * EventDetailsModal — shared by DayGroup (Day/3-Day/Week views) and
- * ScheduleCard (Today), so the modal/history logic lives in one place. */
+/** Wraps an entry's visual row in a click target that opens
+ * EntryDetailsModal — shared by DayGroup, ScheduleCard, AdvisorySummary.
+ * Arrival rules / linkables come from EntryEditingProvider context. */
 export function EventRow({ event, familyMembers, children }: EventRowProps) {
   const [open, setOpen] = useState(false);
+  const { arrivalRules, linkables } = useEntryEditing();
 
   return (
     <>
@@ -22,9 +24,11 @@ export function EventRow({ event, familyMembers, children }: EventRowProps) {
         {children}
       </button>
       {open && (
-        <EventDetailsModal
+        <EntryDetailsModal
           event={event}
           familyMembers={familyMembers}
+          arrivalRules={arrivalRules}
+          linkables={linkables}
           open={open}
           onClose={() => setOpen(false)}
         />

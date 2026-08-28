@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { EntryKind } from "@/lib/types";
 
 /** `kind` is retained for the client's grouping/labelling; the action
- * itself no longer needs it now that events and todos share one table. */
+ * itself no longer needs it now that every kind shares one table. */
 export interface ReviewItemRef {
   id: string;
-  kind: "event" | "todo";
+  kind: EntryKind;
 }
 
 function revalidateReviewViews() {

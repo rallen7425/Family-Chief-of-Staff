@@ -3,18 +3,45 @@
 import { useEffect, useRef } from "react";
 import { X, Send } from "lucide-react";
 import { useChat } from "@/components/chat/ChatProvider";
-import { EventForm } from "@/components/events/EventForm";
-import { TodoForm } from "@/components/todos/TodoForm";
-import { createEventFromChat } from "@/lib/actions/events";
-import { createTodoFromChat } from "@/lib/actions/todos";
+import { EntryForm, type EntryFormInitialValues } from "@/components/entries/EntryForm";
+import { createEntry } from "@/lib/actions/entries";
 import { ASSISTANT_NAME } from "@/lib/config";
+import type { ArrivalBufferRule } from "@/lib/arrival";
+import type { ChatDraft } from "@/lib/chat/types";
 import type { FamilyMember } from "@/lib/types";
 
 interface ChatPanelProps {
   familyMembers: FamilyMember[];
+  arrivalRules: ArrivalBufferRule[];
 }
 
-export function ChatPanel({ familyMembers }: ChatPanelProps) {
+function draftToInitialValues(draft: ChatDraft): Partial<EntryFormInitialValues> {
+  if (draft.kind === "todo") {
+    return {
+      kind: "task",
+      title: draft.title,
+      subjectMemberId: draft.familyMemberId ?? "",
+      date: draft.dueDate,
+    };
+  }
+  return {
+    kind: "event",
+    title: draft.title,
+    subjectMemberId: draft.familyMemberId ?? "",
+    category: draft.category,
+    date: draft.date,
+    time: draft.time,
+    endTime: draft.endTime,
+    arrivalTime: draft.arrivalTime,
+    arrivalSource: draft.arrivalTime ? "stated" : "",
+    location: draft.location,
+    notes: draft.notes,
+    repeatsWeekly: Boolean(draft.recurrenceUntil),
+    repeatUntil: draft.recurrenceUntil,
+  };
+}
+
+export function ChatPanel({ familyMembers, arrivalRules }: ChatPanelProps) {
   const {
     messages,
     draft,
@@ -90,43 +117,26 @@ export function ChatPanel({ familyMembers }: ChatPanelProps) {
               <p className="text-[12px] font-bold tracking-widest text-muted-text uppercase mb-3">
                 {draft.kind === "event" ? "New Event" : "New Todo"}
               </p>
-              {draft.kind === "event" ? (
-                <EventForm
-                  familyMembers={familyMembers}
-                  initialValues={{
-                    title: draft.title,
-                    familyMemberId: draft.familyMemberId ?? "",
-                    date: draft.date,
-                    time: draft.time,
-                    endTime: draft.endTime,
-                    location: draft.location,
-                    notes: draft.notes,
-                    repeatsWeekly: Boolean(draft.recurrenceUntil),
-                    repeatUntil: draft.recurrenceUntil,
-                  }}
-                  submitLabel="Add to Schedule"
-                  onSubmit={(input) =>
-                    createEventFromChat(input, { message: draftSourceMessage ?? undefined })
-                  }
-                  onSuccess={() => resolveDraft(`Added "${draft.title}" to the schedule.`)}
-                  onCancel={clearDraft}
-                />
-              ) : (
-                <TodoForm
-                  familyMembers={familyMembers}
-                  initialValues={{
-                    title: draft.title,
-                    familyMemberId: draft.familyMemberId ?? "",
-                    dueDate: draft.dueDate,
-                  }}
-                  submitLabel="Add to Todo"
-                  onSubmit={(input) =>
-                    createTodoFromChat(input, { message: draftSourceMessage ?? undefined })
-                  }
-                  onSuccess={() => resolveDraft(`Added "${draft.title}" to your todos.`)}
-                  onCancel={clearDraft}
-                />
-              )}
+              <EntryForm
+                mode="create"
+                kindLocked
+                familyMembers={familyMembers}
+                arrivalRules={arrivalRules}
+                initialValues={draftToInitialValues(draft)}
+                submitLabel={draft.kind === "event" ? "Add to Schedule" : "Add to Todo"}
+                onSubmit={(input) =>
+                  createEntry(input, {
+                    sourceType: "chat",
+                    sourceDetail: { message: draftSourceMessage ?? undefined },
+                  })
+                }
+                onSuccess={() =>
+                  resolveDraft(
+                    `Added "${draft.title}" to ${draft.kind === "event" ? "the schedule" : "your todos"}.`
+                  )
+                }
+                onCancel={clearDraft}
+              />
             </div>
           )}
         </div>

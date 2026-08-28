@@ -1,4 +1,5 @@
 import { format, isSameDay } from "date-fns";
+import { Bell } from "lucide-react";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
@@ -9,6 +10,29 @@ interface DayGroupProps {
   events: CalendarEvent[];
   familyMembers: FamilyMember[];
   showDateHeader?: boolean;
+}
+
+function ArrivalBadge({ event }: { event: CalendarEvent }) {
+  if (!event.arrivalAt) return null;
+  const blue = event.arrivalSource === "manual" || event.arrivalSource === "stated";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 mt-1 text-[11px] font-medium px-1.5 py-0.5 rounded ${
+        blue ? "bg-[#EEF2FB] text-[#3B6FE5]" : "bg-[#F3EEF9] text-[#7C5CBF]"
+      }`}
+    >
+      Arrive {format(new Date(event.arrivalAt), "h:mm a")}
+    </span>
+  );
+}
+
+function ReminderSubLine({ reminder }: { reminder: CalendarEvent }) {
+  return (
+    <p className="flex items-center gap-1.5 text-[13px] text-muted-label mt-1">
+      <Bell size={12} className="shrink-0" />
+      {reminder.title}
+    </p>
+  );
 }
 
 export function DayGroup({ date, events, familyMembers, showDateHeader = true }: DayGroupProps) {
@@ -22,9 +46,7 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
       {showDateHeader && (
         <div className="flex items-baseline gap-2 mb-3">
           <h3
-            className={`text-[13px] font-bold uppercase tracking-wide ${
-              isToday ? "text-primary" : "text-muted-text"
-            }`}
+            className={`text-[13px] font-bold uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-text"}`}
           >
             {format(date, "EEE")}
           </h3>
@@ -40,6 +62,7 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
         <div className="flex flex-col gap-5 pb-2">
           {timedEvents.map((event) => {
             const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
+            const isStandaloneReminder = event.kind === "reminder";
             return (
               <EventRow key={event.id} event={event} familyMembers={familyMembers}>
                 <div className="flex gap-4 items-start">
@@ -48,12 +71,23 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
                   </div>
                   <div
                     className={`w-[3px] self-stretch rounded-full mt-0.5 ${
-                      member ? ACCENT_BG[member.accentColor] : "bg-border"
+                      isStandaloneReminder ? "bg-border" : member ? ACCENT_BG[member.accentColor] : "bg-border"
                     }`}
                   />
                   <div className="flex-1">
-                    <h4 className="font-semibold text-[16px] text-ink leading-tight mb-0.5">{event.title}</h4>
+                    {isStandaloneReminder ? (
+                      <p className="flex items-center gap-1.5 text-[14px] text-muted-text leading-tight">
+                        <Bell size={13} className="shrink-0 text-muted-label" />
+                        {event.title}
+                      </p>
+                    ) : (
+                      <h4 className="font-semibold text-[16px] text-ink leading-tight mb-0.5">{event.title}</h4>
+                    )}
                     {event.location && <p className="text-[13px] text-muted-label">{event.location}</p>}
+                    <ArrivalBadge event={event} />
+                    {event.reminders?.map((r) => (
+                      <ReminderSubLine key={r.id} reminder={r} />
+                    ))}
                   </div>
                 </div>
               </EventRow>

@@ -4,6 +4,7 @@ import {
   endOfMonth,
   endOfWeek,
   eachDayOfInterval,
+  format,
   isSameDay,
   startOfDay,
   startOfMonth,
@@ -11,8 +12,9 @@ import {
   subDays,
   subMonths,
 } from "date-fns";
-import { getEventsInRange } from "@/lib/data/events";
+import { getEventsInRange, getLinkableEntries } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { parseDateParam, formatDateParam } from "@/lib/dateParam";
 import type { CalendarEvent, ScheduleViewMode } from "@/lib/types";
 import { ViewModeSwitcher } from "@/components/schedule/ViewModeSwitcher";
@@ -22,7 +24,8 @@ import { DayView } from "@/components/schedule/DayView";
 import { ThreeDayView } from "@/components/schedule/ThreeDayView";
 import { WeekView } from "@/components/schedule/WeekView";
 import { MonthView } from "@/components/schedule/MonthView";
-import { AddEventDialog } from "@/components/events/AddEventDialog";
+import { AddEntryDialog } from "@/components/entries/AddEntryDialog";
+import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 
 const VALID_VIEWS: ScheduleViewMode[] = ["day", "3day", "week", "month"];
 
@@ -44,7 +47,16 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   const person = typeof searchParams.person === "string" ? searchParams.person : "all";
   const date = parseDateParam(typeof searchParams.date === "string" ? searchParams.date : undefined);
 
-  const familyMembers = await getFamilyMembers();
+  const [familyMembers, arrivalRules, linkables] = await Promise.all([
+    getFamilyMembers(),
+    getArrivalBufferRules(),
+    getLinkableEntries(),
+  ]);
+  const linkableOptions = linkables.map((e) => ({
+    id: e.id,
+    title: e.title,
+    when: e.allDay ? format(new Date(e.startsAt), "MMM d") : format(new Date(e.startsAt), "MMM d, h:mm a"),
+  }));
 
   function buildHref(overrides: { view?: ScheduleViewMode; date?: Date; person?: string }) {
     const params = new URLSearchParams({
@@ -100,7 +112,13 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
     <>
       <div className="flex items-center justify-between">
         <h1 className="font-display font-semibold text-[28px] leading-tight text-ink">Schedule</h1>
-        <AddEventDialog familyMembers={familyMembers} />
+        <AddEntryDialog
+          familyMembers={familyMembers}
+          arrivalRules={arrivalRules}
+          linkables={linkableOptions}
+          defaultKind="event"
+          label="Add event"
+        />
       </div>
 
       <ViewModeSwitcher active={view} buildHref={(v) => buildHref({ view: v })} />
@@ -120,27 +138,29 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
         buildHref={(personId) => buildHref({ person: personId })}
       />
 
-      {view === "day" && <DayView date={date} events={events} familyMembers={familyMembers} />}
-      {view === "3day" && (
-        <ThreeDayView
-          days={bucketByDay(eachDayOfInterval({ start: rangeStart, end: addDays(rangeEnd, -1) }), events)}
-          familyMembers={familyMembers}
-        />
-      )}
-      {view === "week" && (
-        <WeekView
-          days={bucketByDay(eachDayOfInterval({ start: rangeStart, end: addDays(rangeEnd, -1) }), events)}
-          familyMembers={familyMembers}
-        />
-      )}
-      {view === "month" && (
-        <MonthView
-          month={date}
-          events={events}
-          familyMembers={familyMembers}
-          buildDayHref={(d) => buildHref({ view: "day", date: d })}
-        />
-      )}
+      <EntryEditingProvider arrivalRules={arrivalRules} linkables={linkableOptions}>
+        {view === "day" && <DayView date={date} events={events} familyMembers={familyMembers} />}
+        {view === "3day" && (
+          <ThreeDayView
+            days={bucketByDay(eachDayOfInterval({ start: rangeStart, end: addDays(rangeEnd, -1) }), events)}
+            familyMembers={familyMembers}
+          />
+        )}
+        {view === "week" && (
+          <WeekView
+            days={bucketByDay(eachDayOfInterval({ start: rangeStart, end: addDays(rangeEnd, -1) }), events)}
+            familyMembers={familyMembers}
+          />
+        )}
+        {view === "month" && (
+          <MonthView
+            month={date}
+            events={events}
+            familyMembers={familyMembers}
+            buildDayHref={(d) => buildHref({ view: "day", date: d })}
+          />
+        )}
+      </EntryEditingProvider>
     </>
   );
 }

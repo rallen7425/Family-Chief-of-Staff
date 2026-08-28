@@ -55,7 +55,16 @@ export const CHAT_TOOLS: Anthropic.Tool[] = [
           type: "string",
           description: "24-hour time (HH:mm) the event ends, only if a duration or end time was mentioned or clearly implied (e.g. 'a 1-hour lesson' from a stated start time). Omit otherwise.",
         },
-        location: { type: "string", description: "Where the event takes place, if mentioned." },
+        arrival_time: {
+          type: "string",
+          description: "24-hour time (HH:mm) for an explicitly stated 'arrive by' / 'report by' / 'call time' / 'doors open'. Omit if not stated — a sensible default is applied automatically, so do not guess.",
+        },
+        category: {
+          type: "string",
+          enum: ["game", "practice", "rehearsal", "appointment", "other"],
+          description: "Classify the event into this fixed vocabulary when clear. Omit if unclear.",
+        },
+        location: { type: "string", description: "Where the event takes place, if mentioned. Put it here, not in notes." },
         notes: { type: "string", description: "Any other relevant detail mentioned." },
         recurrence_until: {
           type: "string",
@@ -177,6 +186,8 @@ export function buildDraftFromToolUse(
     date: string;
     time?: string;
     end_time?: string;
+    arrival_time?: string;
+    category?: string;
     location?: string;
     notes?: string;
     recurrence_until?: string;
@@ -187,9 +198,11 @@ export function buildDraftFromToolUse(
     title: input.title,
     familyMemberId: member?.id ?? null,
     familyMemberName: member?.name ?? input.person_name ?? null,
+    category: input.category ?? "",
     date: input.date,
     time: input.time ?? "",
     endTime: input.end_time ?? "",
+    arrivalTime: input.arrival_time ?? "",
     location: input.location ?? "",
     notes: input.notes ?? "",
     recurrenceUntil: input.recurrence_until ?? "",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Menu, Mail, Bell } from "lucide-react";
+import { Settings, Mail, Bell } from "lucide-react";
 
 interface AppHeaderProps {
   pendingReviewCount: number;
@@ -8,12 +8,13 @@ interface AppHeaderProps {
 export function AppHeader({ pendingReviewCount }: AppHeaderProps) {
   return (
     <div className="flex justify-between items-center w-full px-4 py-3">
-      <button
-        aria-label="Menu"
+      <Link
+        href="/settings"
+        aria-label="Settings"
         className="text-ink hover:text-primary transition-colors flex items-center"
       >
-        <Menu size={24} strokeWidth={2} />
-      </button>
+        <Settings size={24} strokeWidth={2} />
+      </Link>
       <div className="flex items-center gap-2">
         <button
           aria-label="Mail"

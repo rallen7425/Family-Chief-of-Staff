@@ -3,23 +3,34 @@ import { getActiveKeepInMindItems } from "@/lib/data/keepInMind";
 import { getPendingReviewEvents, getUpcomingEvents } from "@/lib/data/events";
 import { getIncompleteTodos, getUrgentTodos, getPendingReviewTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
 import { NeedsDoingCard } from "@/components/today/NeedsDoingCard";
+import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [keepInMind, urgentTodos, pendingReviewEvents, pendingReviewTodos, upcomingEvents, todos, familyMembers] =
-    await Promise.all([
-      getActiveKeepInMindItems(),
-      getUrgentTodos(),
-      getPendingReviewEvents(),
-      getPendingReviewTodos(),
-      getUpcomingEvents(3),
-      getIncompleteTodos(3),
-      getFamilyMembers(),
-    ]);
+  const [
+    keepInMind,
+    urgentTodos,
+    pendingReviewEvents,
+    pendingReviewTodos,
+    upcomingEvents,
+    todos,
+    familyMembers,
+    arrivalRules,
+  ] = await Promise.all([
+    getActiveKeepInMindItems(),
+    getUrgentTodos(),
+    getPendingReviewEvents(),
+    getPendingReviewTodos(),
+    getUpcomingEvents(3),
+    getIncompleteTodos(3),
+    getFamilyMembers(),
+    getArrivalBufferRules(),
+  ]);
 
   return (
     <>
@@ -34,7 +45,9 @@ export default async function TodayPage() {
         urgentTodos={urgentTodos}
         pendingReviewCount={pendingReviewEvents.length + pendingReviewTodos.length}
       />
-      <ScheduleCard events={upcomingEvents} familyMembers={familyMembers} />
+      <EntryEditingProvider arrivalRules={arrivalRules}>
+        <ScheduleCard events={upcomingEvents} familyMembers={familyMembers} />
+      </EntryEditingProvider>
       <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
     </>
   );

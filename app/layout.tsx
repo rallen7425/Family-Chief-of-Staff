@@ -7,6 +7,7 @@ import { ChatShell } from "@/components/chat/ChatShell";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getPendingReviewEvents } from "@/lib/data/events";
 import { getPendingReviewTodos } from "@/lib/data/todos";
+import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { ASSISTANT_NAME } from "@/lib/config";
 import "./globals.css";
 
@@ -28,10 +29,11 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const [familyMembers, pendingReviewEvents, pendingReviewTodos] = await Promise.all([
+  const [familyMembers, pendingReviewEvents, pendingReviewTodos, arrivalRules] = await Promise.all([
     getFamilyMembers(),
     getPendingReviewEvents(),
     getPendingReviewTodos(),
+    getArrivalBufferRules(),
   ]);
   const pendingReviewCount = pendingReviewEvents.length + pendingReviewTodos.length;
 
@@ -47,7 +49,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <TabPillRow />
           </header>
           <main className="px-6 py-2 flex flex-col gap-6">{children}</main>
-          <ChatShell familyMembers={familyMembers} />
+          <ChatShell familyMembers={familyMembers} arrivalRules={arrivalRules} />
         </ChatProvider>
       </body>
     </html>

@@ -1,6 +1,8 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getMemberEmailDomains } from "@/lib/data/memberEmailDomains";
+import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import type { ArrivalBufferRule } from "@/lib/arrival";
 import { getGmailClient } from "./gmail/client";
 import { listRecentMessageIds, fetchMessageDetail } from "./gmail/fetchMessages";
 import { fetchAttachmentBuffer } from "./gmail/fetchAttachments";
@@ -55,7 +57,8 @@ async function processMessage(
   messageId: string,
   googleAccountEmail: string | null,
   familyMembers: FamilyMember[],
-  emailDomains: MemberEmailDomain[]
+  emailDomains: MemberEmailDomain[],
+  arrivalRules: ArrivalBufferRule[]
 ): Promise<MessageOutcome> {
   const supabase = getSupabaseClient();
   try {
@@ -95,7 +98,8 @@ async function processMessage(
         googleAccountEmail,
       },
       familyMembers,
-      emailDomains
+      emailDomains,
+      arrivalRules
     );
 
     await supabase.from("email_scan_log").insert({
@@ -130,10 +134,11 @@ async function processMessage(
 
 export async function runGmailScanPipeline(): Promise<PipelineResult> {
   const supabase = getSupabaseClient();
-  const [{ gmail, googleAccountEmail }, familyMembers, emailDomains] = await Promise.all([
+  const [{ gmail, googleAccountEmail }, familyMembers, emailDomains, arrivalRules] = await Promise.all([
     getGmailClient(),
     getFamilyMembers(),
     getMemberEmailDomains(),
+    getArrivalBufferRules(),
   ]);
 
   const messageIds = await listRecentMessageIds(gmail);
@@ -177,7 +182,7 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
   }
 
   const outcomes = await mapWithConcurrency(toProcess, MESSAGE_CONCURRENCY, (id) =>
-    processMessage(gmail, id, googleAccountEmail, familyMembers, emailDomains)
+    processMessage(gmail, id, googleAccountEmail, familyMembers, emailDomains, arrivalRules)
   );
 
   for (const outcome of outcomes) {

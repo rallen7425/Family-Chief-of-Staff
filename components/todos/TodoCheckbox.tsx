@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Check } from "lucide-react";
-import { toggleTodo } from "@/lib/actions/todos";
+import { toggleTaskComplete } from "@/lib/actions/entries";
 
 interface TodoCheckboxProps {
   id: string;
@@ -13,7 +13,7 @@ export function TodoCheckbox({ id, completed }: TodoCheckboxProps) {
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
-    startTransition(() => toggleTodo(id, !completed));
+    startTransition(() => toggleTaskComplete(id, !completed));
   }
 
   return (

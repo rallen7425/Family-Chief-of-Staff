@@ -34,35 +34,88 @@ export interface SourceDetail {
   googleAccountEmail?: string;
 }
 
+export type BusyStatus = "busy" | "free";
+export type EntryScope = "personal" | "family";
+export type ArrivalSource = "stated" | "inferred" | "manual";
+
+/** A schedule-facing entry — kind `event`, `advisory`, or `reminder`.
+ * (`familyMemberId` is the Subject; kept under the old name so the
+ * visibility rule and calendar components don't churn.) */
 export interface CalendarEvent {
   id: string;
   title: string;
   kind: EntryKind;
   familyMemberId: string | null;
+  ownerMemberIds: string[];
+  scope: EntryScope;
+  busyStatus: BusyStatus;
   category?: string;
   startsAt: string; // ISO datetime
   endsAt?: string; // ISO datetime
+  /** Set for kind `task` (this shape is reused for the review queue, which
+   * mixes all four kinds). YYYY-MM-DD. */
+  dueDate?: string;
   allDay: boolean;
   location?: string;
+  locationLat?: number;
+  locationLng?: number;
   notes?: string;
+  arrivalAt?: string; // ISO datetime
+  arrivalSource?: ArrivalSource;
   status: ItemStatus;
   sourceType: SourceType;
   sourceDetail?: SourceDetail;
   /** Shared across every row generated from one recurring-event input (e.g.
    * "every Saturday until Dec 1"). Null for one-off events. */
   recurrenceId?: string;
+  recurrenceUntil?: string; // YYYY-MM-DD
+  /** Set on a reminder: the event/task it's attached to. Null = standalone. */
+  linkedEntryId?: string | null;
+  /** Reminders linked to this entry, attached for schedule rendering. */
+  reminders?: CalendarEvent[];
   createdAt: string; // ISO datetime
 }
 
+/** A todo-list-facing entry — kind `task`. */
 export interface Todo {
   id: string;
   title: string;
   familyMemberId: string | null;
+  ownerMemberIds: string[];
   dueDate?: string; // YYYY-MM-DD
+  notes?: string;
   completed: boolean;
   status: ItemStatus;
   sourceType: SourceType;
   sourceDetail?: SourceDetail;
+}
+
+/** Superset input for creating or updating any kind of entry (EntryForm
+ * plus the createEntry / updateEntry actions). Times are pre-resolved to
+ * ISO instants by the client (browser TZ) or the pipeline (household TZ). */
+export interface EntryInput {
+  kind: EntryKind;
+  title: string;
+  subjectMemberId: string | null;
+  ownerMemberIds: string[];
+  scope: EntryScope;
+  busyStatus: BusyStatus;
+  category?: string | null;
+  notes?: string | null;
+  location?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  dueAt?: string | null; // YYYY-MM-DD
+  allDay: boolean;
+  arrivalAt?: string | null;
+  arrivalSource?: ArrivalSource | null;
+  linkedEntryId?: string | null;
+  recurrence?: {
+    localDate: string;
+    localStartTime?: string;
+    localEndTime?: string;
+    untilDate: string;
+  } | null;
 }
 
 export interface KeepInMindItem {
