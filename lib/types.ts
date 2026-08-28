@@ -2,10 +2,12 @@ export type AccentColor = "coral" | "teal" | "gold" | "berry";
 export type SourceType = "manual" | "chat" | "email_scan" | "system";
 export type ItemStatus = "pending_review" | "confirmed" | "dismissed";
 
-/** P0 introduces `advisory` alongside `event` on the calendar. P1 widens
- * this to the full unified set (event | task | reminder | advisory) when
- * `events` + `todos` merge into one `entries` table. */
-export type EntryKind = "event" | "advisory";
+/** The unified content model: one `entries` table, four kinds.
+ * - event    — on the schedule, no checkbox ("Football practice")
+ * - task     — on the todo list, has a checkbox ("Return signed forms")
+ * - reminder — a sub-line under what it's about, or standalone on its own date
+ * - advisory — on the schedule, visually distinct ("lane closure — allow extra time") */
+export type EntryKind = "event" | "task" | "reminder" | "advisory";
 
 export interface FamilyMember {
   id: string;

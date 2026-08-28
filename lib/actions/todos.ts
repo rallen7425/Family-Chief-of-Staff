@@ -20,10 +20,14 @@ export async function createTodo(input: TodoInput): Promise<{ error?: string }> 
   if (!title) return { error: "Title is required." };
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("todos").insert({
+  const { error } = await supabase.from("entries").insert({
+    kind: "task",
     title,
-    family_member_id: input.familyMemberId,
-    due_date: input.dueDate || null,
+    subject_member_id: input.familyMemberId,
+    due_at: input.dueDate || null,
+    is_all_day: false,
+    busy_status: "free",
+    scope: "family",
     status: "confirmed",
     source_type: "manual",
   });
@@ -43,10 +47,14 @@ export async function createTodoFromChat(
   if (!title) return { error: "Title is required." };
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("todos").insert({
+  const { error } = await supabase.from("entries").insert({
+    kind: "task",
     title,
-    family_member_id: input.familyMemberId,
-    due_date: input.dueDate || null,
+    subject_member_id: input.familyMemberId,
+    due_at: input.dueDate || null,
+    is_all_day: false,
+    busy_status: "free",
+    scope: "family",
     status: "confirmed",
     source_type: "chat",
     source_detail: sourceDetail,
@@ -61,7 +69,7 @@ export async function createTodoFromChat(
  * completing it or dismissing a pending-review item. Mirrors deleteEvent. */
 export async function deleteTodo(id: string): Promise<{ error?: string }> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("todos").delete().eq("id", id);
+  const { error } = await supabase.from("entries").delete().eq("id", id);
   if (error) return { error: error.message };
 
   revalidateTodoViews();
@@ -71,10 +79,10 @@ export async function deleteTodo(id: string): Promise<{ error?: string }> {
 
 export async function toggleTodo(id: string, completed: boolean): Promise<void> {
   const supabase = getSupabaseClient();
+  // Completion is derived from completed_at (no separate boolean column on entries).
   const { error } = await supabase
-    .from("todos")
+    .from("entries")
     .update({
-      completed,
       completed_at: completed ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })

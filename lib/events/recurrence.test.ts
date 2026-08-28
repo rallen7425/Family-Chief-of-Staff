@@ -40,7 +40,7 @@ describe("buildEventRows — one-off", () => {
 
   it("trims location and nulls out empty strings", () => {
     const [row] = buildEventRows({ title: "Tumbling", input: baseInput, sourceType: "manual" });
-    expect(row.location).toBe("Gym");
+    expect(row.location_text).toBe("Gym");
     expect(row.notes).toBeNull();
   });
 

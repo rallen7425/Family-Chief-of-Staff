@@ -12,33 +12,40 @@ export interface FamilyMemberRow {
   is_adult: boolean;
 }
 
-export interface EventRow {
+/** Row shape of `family_chief_of_staff.entries` — the unified table that
+ * replaced `events` + `todos` in the P1 redesign. */
+export interface EntryRow {
   id: string;
-  title: string;
   kind: EntryKind;
-  family_member_id: string | null;
-  category: string | null;
-  starts_at: string;
-  ends_at: string | null;
-  all_day: boolean;
-  location: string | null;
+  title: string;
   notes: string | null;
+  location_text: string | null;
+  location_lat: number | null;
+  location_lng: number | null;
+  busy_status: "busy" | "free";
+  scope: "personal" | "family";
+  subject_member_id: string | null;
+  category: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  due_at: string | null; // YYYY-MM-DD
+  is_all_day: boolean;
+  arrival_at: string | null;
+  arrival_source: "stated" | "inferred" | "manual" | null;
+  recurrence_id: string | null;
+  recurrence_until: string | null; // YYYY-MM-DD
+  linked_entry_id: string | null;
   status: ItemStatus;
+  completed_at: string | null;
   source_type: SourceType;
   source_detail: SourceDetail | null;
-  recurrence_id: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface TodoRow {
-  id: string;
-  title: string;
-  family_member_id: string | null;
-  due_date: string | null;
-  completed: boolean;
-  status: ItemStatus;
-  source_type: SourceType;
-  source_detail: SourceDetail | null;
+export interface EntryOwnerRow {
+  entry_id: string;
+  family_member_id: string;
 }
 
 export interface KeepInMindRow {

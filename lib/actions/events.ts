@@ -22,7 +22,7 @@ export async function createEvent(input: EventInput): Promise<{ error?: string }
 
   const supabase = getSupabaseClient();
   const rows = buildEventRows({ title, input, sourceType: "manual" });
-  const { error } = await supabase.from("events").insert(rows);
+  const { error } = await supabase.from("entries").insert(rows);
   if (error) return { error: error.message };
 
   revalidateScheduleViews();
@@ -44,7 +44,7 @@ export async function createEventFromChat(
 
   const supabase = getSupabaseClient();
   const rows = buildEventRows({ title, input, sourceType: "chat", sourceDetail });
-  const { error } = await supabase.from("events").insert(rows);
+  const { error } = await supabase.from("entries").insert(rows);
   if (error) return { error: error.message };
 
   revalidateScheduleViews();
@@ -61,14 +61,14 @@ export async function updateEvent(
 
   const supabase = getSupabaseClient();
   const { error } = await supabase
-    .from("events")
+    .from("entries")
     .update({
       title,
-      family_member_id: input.familyMemberId,
+      subject_member_id: input.familyMemberId,
       starts_at: input.startsAt,
       ends_at: input.endsAt || null,
-      all_day: input.allDay,
-      location: input.location?.trim() || null,
+      is_all_day: input.allDay,
+      location_text: input.location?.trim() || null,
       notes: input.notes?.trim() || null,
       // Deliberately not touching `status` here — editing a field is a
       // correction, not a review decision. A pending-review item stays
@@ -94,7 +94,7 @@ export async function updateEvent(
  * once the user dismisses the confirmation. */
 export async function deleteEvent(id: string): Promise<{ error?: string }> {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("events").delete().eq("id", id);
+  const { error } = await supabase.from("entries").delete().eq("id", id);
   if (error) return { error: error.message };
   return {};
 }
@@ -102,7 +102,7 @@ export async function deleteEvent(id: string): Promise<{ error?: string }> {
 export async function confirmEvent(id: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase
-    .from("events")
+    .from("entries")
     .update({ status: "confirmed", updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
@@ -112,7 +112,7 @@ export async function confirmEvent(id: string): Promise<void> {
 export async function dismissEvent(id: string): Promise<void> {
   const supabase = getSupabaseClient();
   const { error } = await supabase
-    .from("events")
+    .from("entries")
     .update({ status: "dismissed", updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
 
+/** `kind` is retained for the client's grouping/labelling; the action
+ * itself no longer needs it now that events and todos share one table. */
 export interface ReviewItemRef {
   id: string;
   kind: "event" | "todo";
@@ -15,57 +17,24 @@ function revalidateReviewViews() {
   revalidatePath("/todo");
 }
 
-function splitByKind(items: ReviewItemRef[]) {
-  return {
-    eventIds: items.filter((item) => item.kind === "event").map((item) => item.id),
-    todoIds: items.filter((item) => item.kind === "todo").map((item) => item.id),
-  };
+async function setStatus(items: ReviewItemRef[], status: "confirmed" | "dismissed"): Promise<void> {
+  if (items.length === 0) return;
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from("entries")
+    .update({ status, updated_at: new Date().toISOString() })
+    .in(
+      "id",
+      items.map((item) => item.id)
+    );
+  if (error) throw error;
+  revalidateReviewViews();
 }
 
 export async function approveReviewItems(items: ReviewItemRef[]): Promise<void> {
-  if (items.length === 0) return;
-  const supabase = getSupabaseClient();
-  const { eventIds, todoIds } = splitByKind(items);
-  const updated_at = new Date().toISOString();
-
-  if (eventIds.length > 0) {
-    const { error } = await supabase
-      .from("events")
-      .update({ status: "confirmed", updated_at })
-      .in("id", eventIds);
-    if (error) throw error;
-  }
-  if (todoIds.length > 0) {
-    const { error } = await supabase
-      .from("todos")
-      .update({ status: "confirmed", updated_at })
-      .in("id", todoIds);
-    if (error) throw error;
-  }
-
-  revalidateReviewViews();
+  await setStatus(items, "confirmed");
 }
 
 export async function removeReviewItems(items: ReviewItemRef[]): Promise<void> {
-  if (items.length === 0) return;
-  const supabase = getSupabaseClient();
-  const { eventIds, todoIds } = splitByKind(items);
-  const updated_at = new Date().toISOString();
-
-  if (eventIds.length > 0) {
-    const { error } = await supabase
-      .from("events")
-      .update({ status: "dismissed", updated_at })
-      .in("id", eventIds);
-    if (error) throw error;
-  }
-  if (todoIds.length > 0) {
-    const { error } = await supabase
-      .from("todos")
-      .update({ status: "dismissed", updated_at })
-      .in("id", todoIds);
-    if (error) throw error;
-  }
-
-  revalidateReviewViews();
+  await setStatus(items, "dismissed");
 }

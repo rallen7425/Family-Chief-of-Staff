@@ -34,19 +34,25 @@ export interface EventInput {
   recurrence?: EventRecurrence;
 }
 
+/** Insert shape for `family_chief_of_staff.entries` (event / advisory rows
+ * from the manual + chat paths). entry_owners rows are handled separately
+ * by the action layer, not here. */
 export interface EventRowInsert {
-  title: string;
   kind: EntryKind;
-  family_member_id: string | null;
-  all_day: boolean;
-  location: string | null;
+  title: string;
+  subject_member_id: string | null;
+  is_all_day: boolean;
+  location_text: string | null;
   notes: string | null;
+  busy_status: "busy" | "free";
+  scope: "personal" | "family";
   status: "confirmed";
   source_type: SourceType;
   source_detail: SourceDetail | null;
   starts_at: string;
   ends_at: string | null;
   recurrence_id: string | null;
+  recurrence_until: string | null;
 }
 
 interface BuildRowsOptions {
@@ -81,20 +87,34 @@ export function buildEventRows({
   sourceType,
   sourceDetail,
 }: BuildRowsOptions): EventRowInsert[] {
+  const kind = input.kind ?? "event";
   const base = {
+    kind,
     title,
-    kind: input.kind ?? "event",
-    family_member_id: input.familyMemberId,
-    all_day: input.allDay,
-    location: input.location?.trim() || null,
+    subject_member_id: input.familyMemberId,
+    is_all_day: input.allDay,
+    location_text: input.location?.trim() || null,
     notes: input.notes?.trim() || null,
+    // Default by kind: events are checked for scheduling conflicts, advisories aren't.
+    busy_status: (kind === "advisory" ? "free" : "busy") as "busy" | "free",
+    // P1a leaves scope at the neutral default; the EntryForm and extraction
+    // paths set it deliberately (adult subject -> 'personal') in P1b.
+    scope: "family" as const,
     status: "confirmed" as const,
     source_type: sourceType,
     source_detail: sourceDetail ?? null,
   };
 
   if (!input.recurrence) {
-    return [{ ...base, starts_at: input.startsAt, ends_at: input.endsAt || null, recurrence_id: null }];
+    return [
+      {
+        ...base,
+        starts_at: input.startsAt,
+        ends_at: input.endsAt || null,
+        recurrence_id: null,
+        recurrence_until: null,
+      },
+    ];
   }
 
   const { localDate, localStartTime, localEndTime, untilDate } = input.recurrence;
@@ -105,5 +125,6 @@ export function buildEventRows({
     starts_at: householdLocalToInstant(date, localStartTime),
     ends_at: localEndTime ? householdLocalToInstant(date, localEndTime) : null,
     recurrence_id: recurrenceId,
+    recurrence_until: untilDate,
   }));
 }

@@ -78,13 +78,16 @@ export async function writeExtractedItems(
 
     if (item.kind === "event") {
       if (!item.date) continue; // an event with no date isn't useful on the calendar
-      const { error } = await supabase.from("events").insert({
+      const { error } = await supabase.from("entries").insert({
+        kind: "event",
         title: item.title,
-        family_member_id: familyMemberId,
+        subject_member_id: familyMemberId,
         starts_at: householdLocalToInstant(item.date, item.time),
-        all_day: !item.time,
-        location: item.location,
+        is_all_day: !item.time,
+        location_text: item.location,
         notes: item.notes,
+        busy_status: "busy",
+        scope: "family",
         status: "pending_review",
         source_type: "email_scan",
         source_detail: sourceDetail,
@@ -92,10 +95,14 @@ export async function writeExtractedItems(
       if (error) throw error;
       eventsCreated++;
     } else {
-      const { error } = await supabase.from("todos").insert({
+      const { error } = await supabase.from("entries").insert({
+        kind: "task",
         title: item.title,
-        family_member_id: familyMemberId,
-        due_date: item.date,
+        subject_member_id: familyMemberId,
+        due_at: item.date,
+        is_all_day: false,
+        busy_status: "free",
+        scope: "family",
         status: "pending_review",
         source_type: "email_scan",
         source_detail: sourceDetail,
