@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { format } from "date-fns";
+import { isPastReviewEntry } from "@/lib/reviewExpiry";
 import type { Todo } from "@/lib/types";
 import type { EntryRow } from "@/lib/data/dbTypes";
 
@@ -73,6 +74,10 @@ export const getUrgentTodos = cache(async (): Promise<Todo[]> => {
   return data.map(mapTodo);
 });
 
+/** Past-due tasks are dropped here (view-time only, status untouched) so the
+ * approval badge matches the /review list — see getPendingReviewEntries.
+ * A task with no due date never expires. Overdue-but-actionable tasks still
+ * surface via getUrgentTodos, which is deliberately independent of this. */
 export const getPendingReviewTodos = cache(async (): Promise<Todo[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -83,5 +88,7 @@ export const getPendingReviewTodos = cache(async (): Promise<Todo[]> => {
     .order("created_at")
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-  return data.map(mapTodo);
+  return data
+    .map(mapTodo)
+    .filter((todo) => !isPastReviewEntry({ kind: "task", dueDate: todo.dueDate }));
 });

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { isEventVisibleToViewer } from "@/lib/visibility";
+import { dropPastReviewEntries } from "@/lib/reviewExpiry";
 import type { CalendarEvent } from "@/lib/types";
 import type { EntryRow } from "@/lib/data/dbTypes";
 
@@ -109,7 +110,8 @@ export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]>
 }
 
 /** Wrapped in cache() since the root layout (notification badge) and the
- * Today page (approval summary line) both need this within one request. */
+ * Today page (approval summary line) both need this within one request.
+ * Past-dated items are filtered out — see getPendingReviewEntries. */
 export const getPendingReviewEvents = cache(async (): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -120,12 +122,16 @@ export const getPendingReviewEvents = cache(async (): Promise<CalendarEvent[]> =
     .order("starts_at")
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-  return data.map(mapEvent);
+  return dropPastReviewEntries(data.map(mapEvent));
 });
 
 /** Every pending-review entry, all four kinds, as CalendarEvent-shaped
  * rows (tasks carry `dueDate`; `startsAt` falls back to created_at and is
- * unused for them). Feeds the /review page's one unified list. */
+ * unused for them). Feeds the /review page's one unified list.
+ *
+ * Entries whose date has already passed are dropped — a scanned email
+ * about last week's game isn't worth reviewing. They keep their
+ * `pending_review` status in the DB; this is a view-time filter only. */
 export const getPendingReviewEntries = cache(async (): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -135,7 +141,7 @@ export const getPendingReviewEntries = cache(async (): Promise<CalendarEvent[]> 
     .order("created_at")
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-  return data.map(mapEvent);
+  return dropPastReviewEntries(data.map(mapEvent));
 });
 
 /** Confirmed events + advisories (not reminders) a reminder can be linked
