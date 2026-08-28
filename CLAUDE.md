@@ -1,8 +1,59 @@
 @AGENTS.md
 
-# Rufus — CLAUDE.md
+# Family Chief of Staff — CLAUDE.md
 
-**Working name:** Rufus (chief-of-staff chat identity). Product name TBD.
+**"Rufus" is the AI assistant's name in the UI only** — the chat bar placeholder
+and the browser tab title, driven by the single `ASSISTANT_NAME` constant in
+`lib/config.ts`. Product name still TBD.
+
+**Infrastructure naming rule (no exceptions):** every piece of infrastructure —
+Postgres schema and every object in it (tables, indexes, constraints, functions),
+Vercel project and aliases, GitHub repo, GCP project, local folder, package name,
+migration files, `_meta.apps` — uses `family_chief_of_staff` / `family-chief-of-staff`.
+"Rufus" must never appear in any of them. If you find it there, it's a bug to fix,
+not a convention to follow.
+
+---
+
+## Session status (2026-08-28)
+
+Two pieces of work, both cleanup before any new functionality:
+
+**1. Gmail-scan pipeline was timing out (fixed, committed `3dc161d`, not yet
+deployed).** A scheduled run on 2026-08-27 hit the route's 60s `maxDuration` and
+the Vercel function 504'd — the per-message loop was fully sequential (Gmail fetch
++ attachment parse + one Claude call each) and a burst of ~19 new emails couldn't
+finish in time. Fix in `scripts/pipeline/index.ts`: process at most 8 not-yet-seen
+messages per run (rest deferred to the next 2-hour tick, which picks them up
+because they stay unlogged), 4-way concurrent instead of sequential, oldest-first
+so a backlog drains in order, and one batched dedupe query instead of one per
+message. Also pinned `maxDuration = 60` on the chat route and refreshed obsolete
+comments in the workflow file. Verified against the real inbox: 8 messages in
+6.8s, 0 errors. **Still needs `git push` + `vercel --prod`.**
+
+**2. "Rufus" infra-naming audit.** The 2026-08-25 rename missed several spots
+because `ALTER SCHEMA … RENAME` doesn't rename objects inside the schema, and
+because a few external surfaces aren't covered by a migration. Full findings and
+fixes:
+
+| Where | Was | Now |
+|---|---|---|
+| 5 Postgres indexes (`idx_rufus_events_starts_at`, `_events_person`, `_events_status`, `_todos_person`, `_events_recurrence_id`) | still named `idx_rufus_*` | renamed to `idx_family_chief_of_staff_*` via `rocky-coast-labs/supabase/migrations/20260828000001_rename_rufus_indexes.sql` |
+| `_meta.apps` notes | stale local path `…/Projects/rufus`, false "alias removed" claim | corrected in the same migration |
+| Vercel alias `rufus-olive.vercel.app` | live, served production | removed (`vercel alias rm`) |
+| GitHub repo "About" website link | `https://rufus-olive.vercel.app` | `https://family-chief-of-staff.vercel.app` |
+| `.vercel/project.json` `projectName` | `"rufus"` (stale local CLI cache) | `"family-chief-of-staff"` |
+| `CLAUDE.md` header | `# Rufus — CLAUDE.md` | renamed + explicit infra-naming rule added at top |
+
+**Confirmed already clean:** app code (`git grep -i rufus` → only the intentional
+`lib/config.ts` `ASSISTANT_NAME`), Postgres schema name, Vercel project name,
+GitHub repo name, GitHub Actions secrets/vars, `package.json`. **Deliberately left
+as historical record:** git commit messages, the applied `rocky-coast-labs`
+migration filenames (`*_rufus_*.sql` — renaming applied migrations breaks the
+version tracker), and `docs/design/*` planning docs (a rename banner was added to
+`IMPLEMENTATION-PLAN.md`; the body is the plan as it stood on 2026-08-22).
+**Needs the user in a console (can't verify from here):** GCP project / OAuth
+client name — believed "Family Chief of Staff" per Phase 6, worth a glance.
 
 ---
 

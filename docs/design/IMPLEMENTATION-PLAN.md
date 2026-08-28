@@ -1,5 +1,13 @@
 # Rufus — Family Chief of Staff — Implementation Plan
 
+> **Historical document.** This is the plan as it stood on 2026-08-22, kept for
+> reference. Its infrastructure names are out of date: the working name "Rufus"
+> was later removed from all infrastructure — the Postgres schema is
+> `family_chief_of_staff` (not `rufus`), the local folder / Vercel project /
+> GitHub repo are `family-chief-of-staff` / `Family-Chief-of-Staff`, and "Rufus"
+> now survives only as the in-UI assistant name (`ASSISTANT_NAME` in
+> `lib/config.ts`). See `CLAUDE.md` for the current state and the naming rule.
+
 ## Context
 
 Design/spec work for this app (working name **Rufus**) has already been drafted at `rocky-coast-labs/apps/Family OS App/` (`MVP-Spec.md`, `Design-System.md`, `Family OS - Calendar.md`, `Design Concepts/`) but no code exists yet. The goal now is to turn that spec into a real, deployed app: a single-household assistant with a Today dashboard, a full Schedule/calendar, a Todo list, and a persistent AI chat bar ("Chat with Rufus") that can answer questions and create events/todos from natural language — plus a background pipeline that scans Gmail for schedule-relevant content (body text and docx/pdf attachments, e.g. a coach's season schedule) and adds detected events/todos automatically, flagged for the user to review afterward.
