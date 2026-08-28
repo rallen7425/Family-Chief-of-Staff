@@ -15,7 +15,150 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-08-28)
+## Session status (2026-08-28) — Event/Task/Reminder/Advisory redesign (P0 + P1)
+
+Working from `claude-code-implementation-prompt.md` (in the repo root, untracked):
+a UX-review-driven redesign of the schedule experience — four content kinds,
+better role modeling, arrival-time intelligence, plus a routing-API travel-buffer
+conflict feature deferred to a later phase. Phased P0 → P1 → P1.5 → P2, review
+after each.
+
+### State right now — LOCAL ONLY, NOT DEPLOYED
+
+| | |
+|---|---|
+| **Commits** | `family-chief-of-staff`: `f70165e` (P0), `a4d8966` (P1a), `3a90baf` (P1b) — **not pushed**. `rocky-coast-labs`: `c3b9f49` (P0 migration), `a388e16` (P1a migration) — **not pushed**. |
+| **Migrations** | `20260828000002_family_chief_of_staff_entry_kind.sql` + `20260828000003_family_chief_of_staff_entries.sql` — **already applied to the shared DB** via `supabase db push` (verified with smoke scripts). |
+| **Production** | still runs the **pre-redesign code**, reading/writing the old `events`/`todos` tables. |
+| **Checks** | `tsc` / `eslint` / `next build` / `npm test` (61) all green locally. |
+
+**Divergence risk:** the shared DB schema is ahead of deployed prod. The old
+`events` (67 rows) / `todos` (26 rows) tables are **left in place as a rollback
+net** — a follow-up migration drops them once P1 is deployed and verified. But
+the new app writes only to `entries`, so anything created on the live site
+*after* the migrations went in lands in the old tables and won't surface once the
+new code deploys. Reconcile before `vercel --prod` if the site was used today.
+
+### How the DB password worked this session
+
+`rocky-coast-labs/.secrets/db-password.txt` (dated Jul 10) fails SASL auth — looks
+rotated; the user has the current one. Key finding: `supabase db push` from
+`rocky-coast-labs/` **succeeds with a cached credential** even when
+`SUPABASE_DB_PASSWORD` is unset — passing the stale `.secrets` value *explicitly*
+is what was breaking it, so just run `supabase db push` with no env override. The
+CLI (2.107) is authenticated; `rocky-coast-labs` is `linked`. The Docker "failed
+to cache migrations catalog" warning on push is non-fatal.
+
+### P0 — delete action, real date/time pickers, Advisory kind (`f70165e`)
+
+- **Delete** (the UX review's #1 gap — there was no way to delete an event
+  anywhere): `deleteEvent`/`deleteTodo` → now `deleteEntry`. `EntryDetailsModal`
+  edit mode has a "Delete entry" flow: idle red text-link → inline confirm
+  (red-tinted, no native `confirm()`) → "Entry deleted" end-state replacing the
+  form. `deleteEntry` deliberately does NOT `revalidatePath` (that unmounts the
+  modal's host row before the confirmation renders); the client calls
+  `router.refresh()` on "Done".
+- **Date/time pickers** (`components/shared/DatePickerButton.tsx`,
+  `TimePickerButton.tsx`) replace native `<input type=date|time>`, fixing the
+  `08/26/2026` → `mm/08/262026` mangling bug. Month calendar-grid popover
+  (click-only) + scrollable 15-min time list with a tolerant type-to-jump parser
+  (`lib/timeInput.ts` + `.test.ts`, 5 tests: `4pm`, `4:30 pm`, `430pm`, `0930`…).
+- **Advisory** kind: migration `...entry_kind.sql` added `events.kind`
+  (`event`|`advisory`, default `event`). Renders visually distinct — muted, no
+  person color, collapsible "N advisories" strip atop each day
+  (`AdvisorySummary.tsx`); MonthView gives advisory-only days an outline-ring dot;
+  Today card renders advisories muted with an info icon.
+
+### P1a — data/action layer onto the unified `entries` table (`a4d8966`)
+
+Migration `...entries.sql`: created `entries` (4-way `kind`; `busy_status`,
+`scope`, `subject_member_id`, `category`, `due_at date`, `arrival_at` +
+`arrival_source`, `linked_entry_id` self-FK `ON DELETE SET NULL`,
+`recurrence_id`/`recurrence_until`, `completed_at`), `entry_owners`
+(`(entry_id, family_member_id)` PK), `member_locations` (seeded one address-less
+household `Home`), `arrival_buffer_rules` (seeded `{null,15}` + `{game,60}`).
+
+All `events` + `todos` rows copied into `entries` **keeping their ids** (67 event
++ 26 task = 93; verified). `entry_owners` backfilled for kid-subject
+(family-scoped) entries only — adult-subject = `personal`, no owner row (matches
+the form's "personal entry, no separate owner" rule). Judgment calls: `due_at` is
+a `date` not a timestamp; `status` kept `dismissed` (load-bearing for
+`removeReviewItems`); `scope` derived adult→`personal` else `family`.
+
+App swap is **behavior-neutral** — same `CalendarEvent`/`Todo` return shapes,
+internals now query `entries` (`kind in (event,advisory)` for schedule, `task`
+for todos, completion = `completed_at != null`). `review.ts` collapsed its
+by-kind split into one `.in("id", …)`. Old `lib/actions/events.ts`/`todos.ts`
+deleted; new `lib/actions/entries.ts`. Verified live: Today/Schedule/Todo/Review
+render real data, todo-toggle round-trips, chat schedule query intact.
+
+### P1b — EntryForm, Reminder kind, arrival buffers, Settings (`3a90baf`)
+
+- **`EntryForm`** (`components/entries/`) — one create/edit form, all four kinds.
+  4-way Type selector (create only; locked pill in edit), **multi-owner**
+  `MultiOwnerPicker` (§8 — overrides the mockup's single dropdown; adult Subject
+  auto-clears Owner + "Personal entry" caption), Category dropdown (Event +
+  Reminder), Arrival-time field + provenance badge (purple auto/from-email, blue
+  manual, dashed "Not set — no default" empty state), Busy/Free toggle, Reminder
+  "About" linker, Advisory date range. Replaces `EventForm`/`TodoForm`/
+  `AddEventDialog`/`AddTodoDialog` (all deleted). `AddEntryDialog` +
+  `EntryDetailsModal` (renamed from `EventDetailsModal`) wrap it; the `/review`
+  pencil (now wired for every kind) and `ChatPanel`'s proposal card reuse it.
+  `EntryEditingContext` supplies `arrivalRules`/`linkables` to
+  modals opened from list views instead of prop-drilling.
+- **`lib/arrival.ts`** — `matchArrivalRule` / `inferArrivalAt` / `describeArrivalRule`.
+  Exact category match beats the general kids' default; nothing for
+  adult / whole-family / non-event. Used by BOTH `scripts/pipeline/write.ts` and
+  EntryForm's live badge. `lib/arrival.test.ts` (10 tests) covers the §9 cases
+  (kid game → −60min, kid other → −15min, adult/family → none).
+- **Extraction** — `extractEvents.ts` schema widened to 4 kinds + `end_time`,
+  `arrival_time`, `category` (fixed vocab). `write.ts` lands those in structured
+  fields (not notes — fixes the Football-practice "4:00–6:30pm" bug), computes
+  stated-or-inferred arrival, writes an `entry_owners` row for kid subjects,
+  advisories forced to null subject. `index.ts` fetches `arrivalRules` once and
+  threads it in. Chat `create_event_draft` gained `category` + `arrival_time`.
+- **Data** — `lib/data/events.ts`/`todos.ts` embed `entry_owners` via nested
+  select; `attachReminders` nests reminders under their `linkedEntryId` parent
+  (standalone stay top-level). `getPendingReviewEntries` returns all four kinds
+  as `CalendarEvent`-shaped rows (`dueDate` set for tasks) → one unified
+  `/review` list with kind-coloured badges (Event blue / Reminder purple /
+  Task teal / Advisory gray). `getLinkableEntries` backs the "About" picker.
+- **`/settings`** (`app/settings/page.tsx` + `ArrivalRulesEditor.tsx`) — rule
+  list, 5-min steppers (0–180), add/remove, general default not removable,
+  blue worked-example callout. Reached via a **gear icon** in `AppHeader` (the
+  previously-dead hamburger button, now `<Link href="/settings">`).
+- **Schedule rendering** — "Arrive h:mm" pills on event rows (purple inferred /
+  blue manual-stated), linked reminders as bell sub-lines, standalone reminders
+  as compact muted rows. Conflict flags are P1.5.
+
+Verified live: created a kid's game via EntryForm → 60-min "Auto · game default"
+arrival badge auto-filled and rendered on the schedule; `/settings` stepper
+15→20→15 persisted; delete end-state; `/review` + chat query intact.
+
+### Deferred / not built
+
+- **P1.5** — `member_locations` geocoding on save, `busy_status`-driven
+  travel-buffer conflict detection (`lib/conflicts.ts`), conflict banners.
+  **Blocked on a routing API key + billing** (Google Distance Matrix + Geocoding
+  → `GOOGLE_MAPS_API_KEY`, or Mapbox → `MAPBOX_ACCESS_TOKEN`). User is holding
+  off. The table + address-less `Home` row already exist.
+- **P2** — visibility overrides beyond the computed `lib/visibility.ts` rule;
+  per-transport-mode buffers. Depends on P1.5.
+- Recurring-series per-occurrence arrival times (one-off path only in P1b).
+- Chat can only propose `event`/`task` drafts, not `reminder`/`advisory`.
+
+### Next session should
+
+1. `vercel --prod` to deploy P0+P1 (reconcile any prod-created rows first — see
+   Divergence risk above), then click-test the live site.
+2. After verification, a small `rocky-coast-labs` migration dropping the now-orphan
+   `events` / `todos` tables.
+3. Push both repos to `origin/main`.
+4. Then P1.5 once a routing key is provisioned, or whatever the user brings.
+
+---
+
+## Session status (2026-08-28) — earlier: tech-debt / infra-naming cleanup
 
 ### Current status — everything is live and in sync
 
