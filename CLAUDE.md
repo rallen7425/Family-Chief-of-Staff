@@ -40,7 +40,7 @@ fixes:
 |---|---|---|
 | 5 Postgres indexes (`idx_rufus_events_starts_at`, `_events_person`, `_events_status`, `_todos_person`, `_events_recurrence_id`) | still named `idx_rufus_*` | renamed to `idx_family_chief_of_staff_*` via `rocky-coast-labs/supabase/migrations/20260828000001_rename_rufus_indexes.sql` |
 | `_meta.apps` notes | stale local path `…/Projects/rufus`, false "alias removed" claim | corrected in the same migration |
-| Vercel alias `rufus-olive.vercel.app` | live, served production | removed (`vercel alias rm`) |
+| Vercel alias `rufus-olive.vercel.app` | live, served production | removed — see note below |
 | GitHub repo "About" website link | `https://rufus-olive.vercel.app` | `https://family-chief-of-staff.vercel.app` |
 | `.vercel/project.json` `projectName` | `"rufus"` (stale local CLI cache) | `"family-chief-of-staff"` |
 | `CLAUDE.md` header | `# Rufus — CLAUDE.md` | renamed + explicit infra-naming rule added at top |
@@ -54,6 +54,27 @@ version tracker), and `docs/design/*` planning docs (a rename banner was added t
 `IMPLEMENTATION-PLAN.md`; the body is the plan as it stood on 2026-08-22).
 **Needs the user in a console (can't verify from here):** GCP project / OAuth
 client name — believed "Family Chief of Staff" per Phase 6, worth a glance.
+
+**Removing the `rufus-olive.vercel.app` auto-alias took two steps, not one**
+(same family of gotcha as the "alias set vs domains add" note in Phase 8 below).
+`vercel alias rm rufus-olive.vercel.app` removed the live pointer, but the domain
+was still attached to the project, so the very next `vercel --prod` re-aliased it
+(visible as `▲ Aliased https://rufus-olive.vercel.app` in the deploy output). The
+real fix was removing it in the dashboard: **Project → Settings → Domains →
+remove `rufus-olive.vercel.app`**, and confirming `family-chief-of-staff.vercel.app`
+is marked the Production domain. Verified with a fresh `vercel --prod` afterward —
+the deploy aliased only `family-chief-of-staff.vercel.app`, and `rufus-olive`
+returns 404. (CLI `vercel project ls` still prints `rufus-olive.vercel.app` as the
+"Latest Production URL" — that's a stale cache in the pinned old CLI v54, not a
+real remaining attachment; the dashboard and `vercel inspect <deployment>` both
+show only the correct domains.)
+
+**End state — all live and verified 2026-08-28:** pipeline timeout fix deployed
+(routes 200, `/api/pipeline/gmail-scan` returns 401 without the secret), index
+rename migration pushed to GitHub and applied to the shared DB, both repos in sync
+with `origin/main`, no `rufus` anywhere in infrastructure. The Gmail-scan cron's
+next run (or a manual workflow dispatch) will be the first live exercise of the
+new capped/parallel pipeline.
 
 ---
 
