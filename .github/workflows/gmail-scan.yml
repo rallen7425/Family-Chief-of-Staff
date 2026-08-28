@@ -10,11 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Gmail scan
+        # Config lives in repo settings (Settings -> Secrets and variables -> Actions):
+        #   variable APP_URL   = https://family-chief-of-staff.vercel.app
+        #   secret   CRON_SECRET = must match the CRON_SECRET env var on Vercel
+        # The route caps how many new messages it processes per call, so a
+        # backlog drains over several runs rather than timing out in one.
         run: |
           curl -f -X POST \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             "${{ vars.APP_URL }}/api/pipeline/gmail-scan"
-        # Set repo variable APP_URL (Settings -> Secrets and variables -> Actions -> Variables)
-        # to the deployed Vercel URL, and repo secret CRON_SECRET to match .env's CRON_SECRET,
-        # once Phase 8 deploys the app.
