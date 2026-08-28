@@ -23,9 +23,13 @@ const SUPPORTED_ATTACHMENT_MIME_TYPES = new Set([
 
 export async function listRecentMessageIds(
   gmail: gmail_v1.Gmail,
-  query = "newer_than:2d"
+  // 4-day window (cron runs every 2h) gives comfortable slack: the pipeline
+  // processes at most MAX_MESSAGES_PER_RUN new messages per run, so during a
+  // backlog an unprocessed message must survive several runs before its turn —
+  // a 2-day window could let the oldest ones age out unseen.
+  query = "newer_than:4d"
 ): Promise<string[]> {
-  const res = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 25 });
+  const res = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 50 });
   return (res.data.messages ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
 }
 

@@ -76,6 +76,40 @@ with `origin/main`, no `rufus` anywhere in infrastructure. The Gmail-scan cron's
 next run (or a manual workflow dispatch) will be the first live exercise of the
 new capped/parallel pipeline.
 
+### Tech-debt pass (2026-08-28, same session)
+
+After the infra cleanup, ran a debt review and actioned it per the user's calls:
+
+- **`/api/chat` is a fully open public endpoint** (no auth, no secret, no rate
+  limit) — runs up to 4 `claude-opus-5` calls on our key per request and returns
+  real family data. **Deliberately not patched in isolation.** It is to be closed
+  as part of building the full **login / onboarding / user-management flow** (see
+  "Auth / login — not built" below). Known, accepted exposure until then.
+- **Tests added** — Vitest (`npm test`). Covers the pure, high-risk logic:
+  `lib/visibility.ts`, the pipeline's person resolution (`scripts/pipeline/write.ts`),
+  `lib/events/recurrence.ts` (extracted from `lib/actions/events.ts` — DST-safe
+  weekly series), `lib/concurrency.ts` (extracted `mapWithConcurrency` from the
+  pipeline), `lib/householdTime.ts`, `lib/dateParam.ts`. No component/route tests
+  yet — deliberately scoped to logic that fails silently.
+- **Error/loading UI added** — `app/error.tsx`, `app/global-error.tsx`,
+  `app/not-found.tsx`, `app/loading.tsx` (previously a server-component throw
+  showed the raw Next.js error screen).
+- **Node pinned** — `package.json` `engines.node >= 22` (Vercel runs 24.x; local
+  was 20.10). The `ws` WebSocket shim in `lib/supabase.ts` is now conditional
+  (only polyfills when `globalThis.WebSocket` is absent) — once every machine is
+  on Node ≥22, delete the `ws` dep + shim entirely.
+- **Pipeline Gmail window widened** `newer_than:2d` → `newer_than:4d` (and
+  `maxResults` 25 → 50) so the per-run cap of 8 can't strand an unprocessed
+  message past the search window during a backlog.
+- **Backlog triaged** — see the 2026-08-28 note in the review section below.
+- **CLI currency** — Vercel CLI 54→59 and Supabase CLI 2.107→2.116 are a `brew
+  upgrade` the user runs on their machine (not repo state); flagged, commands
+  handed over.
+- **Verified intentional, left as-is:** the split in `lib/actions/*` where
+  form-submit actions return `{ error }` and fire-and-forget actions
+  (`confirmEvent`/`dismissEvent`/`toggleTodo`/review bulk ops) `throw` — not
+  missing error handling, a deliberate pattern matched to how each is called.
+
 ---
 
 ## Session status (2026-08-25)
@@ -734,21 +768,35 @@ email-scan pipeline now writes going forward, but the ~30 items already sitting 
 means they won't be automatically) — their History section will just omit those two
 lines, which the modal already handles gracefully (conditional rendering, not a bug).
 
+## Auth / login — not built (planned major workstream)
+
+There is no login, session, or user-identity concept anywhere in the app. A full
+**login + onboarding + user-management flow** is a planned, significant piece of
+work — not an incremental patch. When it lands it is expected to rework, not just
+extend, several current behaviors. In scope for that effort:
+
+- **Secure `/api/chat`** (currently a fully open public endpoint — see the
+  2026-08-28 tech-debt note above). This is the concrete vulnerability the auth
+  work must close, treated as non-optional.
+- **Real per-person identity** — replaces the static "Added by: Household" label
+  with actual attribution, and gives the app a real "current viewer."
+- **Enforce visibility in the default view** — the adult-private / kid-shared rule
+  in `lib/visibility.ts` currently only applies when the schedule is filtered to a
+  specific person; with a real viewer it should apply everywhere.
+- **Onboarding / user management** — reassign or repeat family-member colors, add
+  or remove members, etc. (the roster is currently a fixed seed).
+
 ## Known follow-ups (not yet scheduled)
+
+These are deferred and will likely be folded into larger reworks rather than
+handled as one-off patches — don't pick one up in isolation without checking it's
+still the right shape.
 
 - Image/screenshot flyer OCR for email-scan attachments (docx/pdf only at launch, per
   the original plan's explicit MVP scope cut).
 - "Message" tab is still just a placeholder (future family-to-family messaging).
 - Cross-email duplicate detection (an original + a "reminder" email describing the same
   real event) isn't handled within the current per-message extraction design.
-- Todos don't have an edit affordance or a "history"/context view like events now do
-  (todos also don't have a `notes`/`location` column at all yet) — the 2026-08-24 work
-  was scoped to events only, per what was actually asked for.
-- "Added by: Household" in the new History section is a static label, not real
-  per-person attribution — there's no user-identity concept in this app yet. Real
-  attribution should come with actual user management/profile-switching, not a
-  standalone `added_by` column bolted on ahead of it.
-- The new visibility rule (adult-private vs. kid-shared) is only enforced when the
-  schedule is filtered to a specific person — the default unfiltered "All" view still
-  shows everything to everyone, since there's no real "current viewer" to enforce
-  privacy against without a login concept.
+- Todos are second-class vs. events: no edit affordance, no "history"/context view, and
+  no `notes`/`location` columns — the 2026-08-24 work was scoped to events only. A todo
+  rework (not a bolt-on) is the right move here.

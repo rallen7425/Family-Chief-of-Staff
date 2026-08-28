@@ -15,7 +15,7 @@ export interface MessageMeta {
 
 /** Extracts the domain from a raw `From:` header value, e.g.
  * `"Austin Prep" <mail1@veracross.com>` → `veracross.com`. */
-function extractSenderDomain(sender: string): string | null {
+export function extractSenderDomain(sender: string): string | null {
   const match = sender.match(/@([\w.-]+)/);
   return match ? match[1].toLowerCase() : null;
 }
@@ -24,14 +24,14 @@ function extractSenderDomain(sender: string): string | null {
  * when the LLM didn't name anyone (common for a school's automated mailer
  * addressed to parents generally). Resolved once per message, not per item,
  * since it only depends on the constant sender address. */
-function resolveByDomain(sender: string, emailDomains: MemberEmailDomain[]): string | null {
+export function resolveByDomain(sender: string, emailDomains: MemberEmailDomain[]): string | null {
   const domain = extractSenderDomain(sender);
   if (!domain) return null;
   const rule = emailDomains.find((d) => domain === d.domain || domain.endsWith(`.${d.domain}`));
   return rule?.familyMemberId ?? null;
 }
 
-function resolvePerson(
+export function resolvePerson(
   hint: string | null,
   domainMemberId: string | null,
   familyMembers: FamilyMember[]

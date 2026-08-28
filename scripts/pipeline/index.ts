@@ -8,6 +8,7 @@ import { parseDocxBuffer } from "./extract/parseDocx";
 import { parsePdfBuffer } from "./extract/parsePdf";
 import { extractItemsFromMessage, type MessageAttachmentContent } from "./extract/extractEvents";
 import { writeExtractedItems } from "./write";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import type { FamilyMember } from "@/lib/types";
 import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 import type { gmail_v1 } from "googleapis";
@@ -47,24 +48,6 @@ interface MessageOutcome {
   note: string;
   eventsCreated: number;
   todosCreated: number;
-}
-
-/** Runs `worker` over `items` with at most `limit` in flight at once. */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function run(): Promise<void> {
-    while (next < items.length) {
-      const current = next++;
-      results[current] = await worker(items[current]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
-  return results;
 }
 
 async function processMessage(

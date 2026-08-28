@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { FamilyMember } from "@/lib/types";
-import type { EventInput } from "@/lib/actions/events";
+import type { EventInput } from "@/lib/events/recurrence";
 import { FORM_INPUT_CLASS, FORM_LABEL_CLASS } from "@/components/shared/formStyles";
 
 export interface EventFormInitialValues {
