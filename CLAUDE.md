@@ -17,98 +17,114 @@ not a convention to follow.
 
 ## Session status (2026-08-28)
 
-Two pieces of work, both cleanup before any new functionality:
+### Current status — everything is live and in sync
 
-**1. Gmail-scan pipeline was timing out (fixed, committed `3dc161d`, not yet
-deployed).** A scheduled run on 2026-08-27 hit the route's 60s `maxDuration` and
-the Vercel function 504'd — the per-message loop was fully sequential (Gmail fetch
-+ attachment parse + one Claude call each) and a burst of ~19 new emails couldn't
-finish in time. Fix in `scripts/pipeline/index.ts`: process at most 8 not-yet-seen
-messages per run (rest deferred to the next 2-hour tick, which picks them up
-because they stay unlogged), 4-way concurrent instead of sequential, oldest-first
-so a backlog drains in order, and one batched dedupe query instead of one per
-message. Also pinned `maxDuration = 60` on the chat route and refreshed obsolete
-comments in the workflow file. Verified against the real inbox: 8 messages in
-6.8s, 0 errors. **Still needs `git push` + `vercel --prod`.**
+All work below is committed, pushed to `origin/main` (HEAD `28b65ea`), and
+deployed to production (`family-chief-of-staff.vercel.app`, verified: all routes
+200, custom 404 renders, API guards return 405/401, `rufus-olive` 404s). Both
+`family-chief-of-staff` and `rocky-coast-labs` repos are clean and pushed. The
+index-rename migration is applied to the shared DB. `npm test` (44) / `tsc` /
+`eslint` / `next build` all green. No `rufus` anywhere in infrastructure.
 
-**2. "Rufus" infra-naming audit.** The 2026-08-25 rename missed several spots
-because `ALTER SCHEMA … RENAME` doesn't rename objects inside the schema, and
-because a few external surfaces aren't covered by a migration. Full findings and
-fixes:
+### Completed this session
 
-| Where | Was | Now |
-|---|---|---|
-| 5 Postgres indexes (`idx_rufus_events_starts_at`, `_events_person`, `_events_status`, `_todos_person`, `_events_recurrence_id`) | still named `idx_rufus_*` | renamed to `idx_family_chief_of_staff_*` via `rocky-coast-labs/supabase/migrations/20260828000001_rename_rufus_indexes.sql` |
-| `_meta.apps` notes | stale local path `…/Projects/rufus`, false "alias removed" claim | corrected in the same migration |
-| Vercel alias `rufus-olive.vercel.app` | live, served production | removed — see note below |
-| GitHub repo "About" website link | `https://rufus-olive.vercel.app` | `https://family-chief-of-staff.vercel.app` |
-| `.vercel/project.json` `projectName` | `"rufus"` (stale local CLI cache) | `"family-chief-of-staff"` |
-| `CLAUDE.md` header | `# Rufus — CLAUDE.md` | renamed + explicit infra-naming rule added at top |
+Three workstreams, all cleanup before new functionality (per standing instruction):
 
-**Confirmed already clean:** app code (`git grep -i rufus` → only the intentional
-`lib/config.ts` `ASSISTANT_NAME`), Postgres schema name, Vercel project name,
-GitHub repo name, GitHub Actions secrets/vars, `package.json`. **Deliberately left
-as historical record:** git commit messages, the applied `rocky-coast-labs`
-migration filenames (`*_rufus_*.sql` — renaming applied migrations breaks the
-version tracker), and `docs/design/*` planning docs (a rename banner was added to
-`IMPLEMENTATION-PLAN.md`; the body is the plan as it stood on 2026-08-22).
-**Needs the user in a console (can't verify from here):** GCP project / OAuth
-client name — believed "Family Chief of Staff" per Phase 6, worth a glance.
+**1. End-to-end review** — git, mail pipeline, DB, Vercel, GitHub. Found: a
+recurring Gmail-scan timeout, a lingering `rufus-olive` Vercel alias, and a
+tech-debt list. All actioned below.
 
-**Removing the `rufus-olive.vercel.app` auto-alias took two steps, not one**
-(same family of gotcha as the "alias set vs domains add" note in Phase 8 below).
-`vercel alias rm rufus-olive.vercel.app` removed the live pointer, but the domain
-was still attached to the project, so the very next `vercel --prod` re-aliased it
-(visible as `▲ Aliased https://rufus-olive.vercel.app` in the deploy output). The
-real fix was removing it in the dashboard: **Project → Settings → Domains →
-remove `rufus-olive.vercel.app`**, and confirming `family-chief-of-staff.vercel.app`
-is marked the Production domain. Verified with a fresh `vercel --prod` afterward —
-the deploy aliased only `family-chief-of-staff.vercel.app`, and `rufus-olive`
-returns 404. (CLI `vercel project ls` still prints `rufus-olive.vercel.app` as the
-"Latest Production URL" — that's a stale cache in the pinned old CLI v54, not a
-real remaining attachment; the dashboard and `vercel inspect <deployment>` both
-show only the correct domains.)
+**2. Gmail-scan pipeline timeout — fixed (`3dc161d`, deployed).** A scheduled run
+on 2026-08-27 hit the route's 60s `maxDuration` and 504'd — the per-message loop
+was fully sequential (Gmail fetch + attachment parse + one Claude call each) and a
+burst of ~19 new emails couldn't finish. Now (`scripts/pipeline/index.ts`):
+processes at most 8 not-yet-seen messages per run (rest deferred to the next
+2-hour tick — they stay unlogged so they're picked up), 4-way concurrent via
+`lib/concurrency.ts` `mapWithConcurrency`, oldest-first so a backlog drains in
+order, one batched dedupe query. `maxDuration = 60` also pinned on the chat route.
+Scan window widened `newer_than:2d` → `4d` (`maxResults` 25 → 50) so the per-run
+cap can't strand a message past the window. Verified against the real inbox
+(8 msgs / ~10s / 0 errors).
 
-**End state — all live and verified 2026-08-28:** pipeline timeout fix deployed
-(routes 200, `/api/pipeline/gmail-scan` returns 401 without the secret), index
-rename migration pushed to GitHub and applied to the shared DB, both repos in sync
-with `origin/main`, no `rufus` anywhere in infrastructure. The Gmail-scan cron's
-next run (or a manual workflow dispatch) will be the first live exercise of the
-new capped/parallel pipeline.
+**3. "Rufus" infra-naming audit — fully closed (`db1f5a4`, `decc24f`).** The
+2026-08-25 schema rename missed spots `ALTER SCHEMA … RENAME` doesn't reach:
 
-### Tech-debt pass (2026-08-28, same session)
+| Where | Fix |
+|---|---|
+| 5 Postgres indexes still `idx_rufus_*` | renamed → `idx_family_chief_of_staff_*` (`rocky-coast-labs/.../20260828000001_rename_rufus_indexes.sql`, applied) |
+| `_meta.apps` notes: stale path, false "alias removed" claim | corrected in the same migration |
+| Vercel alias `rufus-olive.vercel.app` (served production) | removed — **two steps**: `vercel alias rm` only drops the live pointer; the domain stays attached and the next `vercel --prod` re-aliases it. Real fix: dashboard → Project → Settings → Domains → remove it, confirm `family-chief-of-staff.vercel.app` is the Production domain. Verified across two later deploys. (`vercel project ls` still misreports it as "Latest Production URL" — stale cache in the pinned old CLI v54; dashboard + `vercel inspect` are correct.) |
+| GitHub repo "About" link → `rufus-olive` | set to `family-chief-of-staff.vercel.app` |
+| `.vercel/project.json` `projectName: "rufus"` | → `"family-chief-of-staff"` |
+| `CLAUDE.md` / `IMPLEMENTATION-PLAN.md` | retitled; explicit infra-naming rule at top of this file; "historical, names outdated" banner on the plan |
 
-After the infra cleanup, ran a debt review and actioned it per the user's calls:
+Left as historical record on purpose: git commit messages, the applied
+`rocky-coast-labs` migration filenames (`*_rufus_*.sql` — renaming applied
+migrations breaks the version tracker), and the `docs/design/*` plan bodies
+(banner instead of a retro-edit).
 
-- **`/api/chat` is a fully open public endpoint** (no auth, no secret, no rate
-  limit) — runs up to 4 `claude-opus-5` calls on our key per request and returns
-  real family data. **Deliberately not patched in isolation.** It is to be closed
-  as part of building the full **login / onboarding / user-management flow** (see
-  "Auth / login — not built" below). Known, accepted exposure until then.
-- **Tests added** — Vitest (`npm test`). Covers the pure, high-risk logic:
-  `lib/visibility.ts`, the pipeline's person resolution (`scripts/pipeline/write.ts`),
-  `lib/events/recurrence.ts` (extracted from `lib/actions/events.ts` — DST-safe
-  weekly series), `lib/concurrency.ts` (extracted `mapWithConcurrency` from the
-  pipeline), `lib/householdTime.ts`, `lib/dateParam.ts`. No component/route tests
-  yet — deliberately scoped to logic that fails silently.
-- **Error/loading UI added** — `app/error.tsx`, `app/global-error.tsx`,
-  `app/not-found.tsx`, `app/loading.tsx` (previously a server-component throw
-  showed the raw Next.js error screen).
-- **Node pinned** — `package.json` `engines.node >= 22` (Vercel runs 24.x; local
-  was 20.10). The `ws` WebSocket shim in `lib/supabase.ts` is now conditional
-  (only polyfills when `globalThis.WebSocket` is absent) — once every machine is
-  on Node ≥22, delete the `ws` dep + shim entirely.
-- **Pipeline Gmail window widened** `newer_than:2d` → `newer_than:4d` (and
-  `maxResults` 25 → 50) so the per-run cap of 8 can't strand an unprocessed
-  message past the search window during a backlog.
-- **Backlog triaged** — see the 2026-08-28 note in the review section below.
-- **CLI currency** — Vercel CLI 54→59 and Supabase CLI 2.107→2.116 are a `brew
-  upgrade` the user runs on their machine (not repo state); flagged, commands
-  handed over.
-- **Verified intentional, left as-is:** the split in `lib/actions/*` where
+**4. Tech-debt pass (`28b65ea`).**
+- **Tests** — Vitest (`npm test`), 44 tests: `lib/visibility.ts`, pipeline person
+  resolution (`scripts/pipeline/write.ts` — guards the wrong-kid-misattribution
+  regression), `lib/events/recurrence.ts` (DST-safe weekly series, extracted from
+  `lib/actions/events.ts`), `lib/concurrency.ts`, `lib/householdTime.ts`,
+  `lib/dateParam.ts`. Refactors were behaviour-neutral.
+- Tests surfaced a real bug: `householdLocalToInstant` returned TZDate's
+  offset-form ISO (`…-05:00`); normalized to canonical `…Z` so email-scan /
+  recurrence `starts_at` values match the client-computed manual/chat ones.
+- **Error/loading UI** — `app/error.tsx`, `global-error.tsx`, `not-found.tsx`,
+  `loading.tsx` (a server-component throw previously showed the raw Next.js page).
+  Note: Next 16.3 error-boundary prop is `retry`, not `reset`.
+- **Node pinned** — `engines.node >= 22`; `ws` shim in `lib/supabase.ts` made
+  conditional (only when `globalThis.WebSocket` is absent).
+- **Verified intentional, not touched:** the `lib/actions/*` split where
   form-submit actions return `{ error }` and fire-and-forget actions
-  (`confirmEvent`/`dismissEvent`/`toggleTodo`/review bulk ops) `throw` — not
-  missing error handling, a deliberate pattern matched to how each is called.
+  (`confirmEvent`/`dismissEvent`/`toggleTodo`/review bulk ops) `throw`.
+
+### What's broken / open risk
+
+- **`/api/chat` is a fully open public endpoint** — no auth, no secret, no rate
+  limit; runs up to 4 `claude-opus-5` calls on our key per request and returns
+  real family data. Known, accepted exposure — to be closed as part of the auth
+  workstream (see "Auth / login — not built" below), not patched in isolation.
+- **GitHub scheduled cron is intermittently unreliable** — the `gmail-scan`
+  workflow's 2-hour `schedule` trigger drifts / drops runs under GitHub load
+  (normal for free scheduled Actions). The pipeline self-heals (next run catches
+  up) and the timeout fix removes the 504 failure mode, but a `Run failed` email
+  can still appear. Not yet worth migrating off GitHub Actions.
+- **Review backlog: ~54 pending items** (34 events + 20 todos) in `/review`.
+  Most are genuine; cruft to dismiss (I was blocked from bulk-editing the family
+  DB, correctly): Student Orientation ×3, First day of classes ×2, Convocation
+  ×2, School Picture Day (Chapel Dress) ×2, "First EF coach meeting" ×2, "Coffee
+  catch-up with Chris Gardner" == "Chris <> Rick Allen (Zoom)", testing-
+  accommodation-forms todo ×4; "Summer Street lane closure" ×4 (one advisory
+  over-extracted); likely-not-real: "Admissions call … AI Career Boost Blueprint"
+  (cold sales), "School Picture Day Sep 8" (photo-vendor marketing; real one is
+  Sep 14). Keep both Grandparents' Day rows (Oct 6 A–K / Oct 7 L–Z are distinct).
+- **Local dev is still on Node 20.10** (Vercel is 24.x). `@supabase/supabase-js`
+  prints a deprecation warning on every script run. `engines` is pinned but the
+  machine isn't upgraded, so `ws` can't be fully removed yet.
+- **Vercel CLI (54) and Supabase CLI (2.107) are stale** — a `brew upgrade` on
+  the user's machine. The old Vercel CLI is why `vercel project ls` misreports.
+- **GCP project / OAuth client name** — believed "Family Chief of Staff" per
+  Phase 6; not verifiable without `gcloud`. Worth a glance in the console.
+
+### Next session should pick up
+
+1. **User's local-machine chores** (handed over, not blocking): `brew upgrade
+   vercel-cli supabase`; `nvm install 24 && nvm alias default 24`. Once Node is
+   ≥22 everywhere, delete the `ws` dep + `@types/ws` + the shim in
+   `lib/supabase.ts` (~3 lines).
+2. **Triage the `/review` backlog** using the list above — or the user does it in
+   the UI (per-group Approve / per-item dismiss / Approve All).
+3. **Confirm the Gmail-scan cron is healthy** post-deploy — check the next 1–2
+   scheduled runs succeeded (Actions tab) now that the capped/parallel pipeline
+   is live.
+4. **Then**: whatever the user brings. The big planned workstream is **login /
+   onboarding / user management** (see the "Auth / login — not built" section) —
+   securing `/api/chat` is in scope for it.
+5. Lower priority: component/route tests (this pass only covered pure logic);
+   GCP console name check.
 
 ---
 
