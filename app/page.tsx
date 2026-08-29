@@ -1,9 +1,9 @@
 import { format } from "date-fns";
-import { getActiveKeepInMindItems } from "@/lib/data/keepInMind";
-import { getPendingReviewEvents, getTodayScheduleEvents } from "@/lib/data/events";
-import { getIncompleteTodos, getUrgentTodos, getPendingReviewTodos } from "@/lib/data/todos";
+import { getTodayScheduleEvents } from "@/lib/data/events";
+import { getIncompleteTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getRankedNotifications } from "@/lib/notifications";
 import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
 import { NeedsDoingCard } from "@/components/today/NeedsDoingCard";
@@ -12,20 +12,8 @@ import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [
-    keepInMind,
-    urgentTodos,
-    pendingReviewEvents,
-    pendingReviewTodos,
-    todayEvents,
-    todos,
-    familyMembers,
-    arrivalRules,
-  ] = await Promise.all([
-    getActiveKeepInMindItems(),
-    getUrgentTodos(),
-    getPendingReviewEvents(),
-    getPendingReviewTodos(),
+  const [notifications, todayEvents, todos, familyMembers, arrivalRules] = await Promise.all([
+    getRankedNotifications(),
     getTodayScheduleEvents(3),
     getIncompleteTodos(3),
     getFamilyMembers(),
@@ -40,11 +28,7 @@ export default async function TodayPage() {
         </p>
         <h1 className="font-display font-semibold text-[32px] leading-tight text-ink">Today</h1>
       </div>
-      <KeepInMindCard
-        items={keepInMind}
-        urgentTodos={urgentTodos}
-        pendingReviewCount={pendingReviewEvents.length + pendingReviewTodos.length}
-      />
+      <KeepInMindCard notifications={notifications} />
       <EntryEditingProvider arrivalRules={arrivalRules}>
         <ScheduleCard events={todayEvents} familyMembers={familyMembers} />
       </EntryEditingProvider>

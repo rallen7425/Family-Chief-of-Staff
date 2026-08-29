@@ -10,7 +10,13 @@ import { useState } from "react";
  * one line the panel just repeats it; that's expected (see the Today
  * prototype). Todo and review rows navigate instead and stay server-rendered.
  */
-export function KeepInMindSystemRow({ body }: { body: string }) {
+export function KeepInMindSystemRow({
+  body,
+  dotClass = "bg-muted-text",
+}: {
+  body: string;
+  dotClass?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -21,7 +27,7 @@ export function KeepInMindSystemRow({ body }: { body: string }) {
         aria-expanded={open}
         className="w-full flex items-center gap-[9px] py-[5px] text-left"
       >
-        <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-muted-text" />
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
         <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-ink">{body}</span>
       </button>
       {open && (

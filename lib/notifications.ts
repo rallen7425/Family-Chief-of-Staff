@@ -74,6 +74,7 @@ export function buildReviewNudge(pendingCount: number, now: Date): Notification 
 
 export function buildAdvisoryNotification(a: CalendarEvent, now: Date): Notification | null {
   const created = new Date(a.createdAt).getTime();
+  const applicableStart = new Date(a.startsAt).getTime();
   const applicableEnd = endOfDay(new Date(a.endsAt ?? a.startsAt)).getTime();
   const expiresAt = Math.max(created + ADVISORY_TTL_MS, applicableEnd);
   if (now.getTime() >= expiresAt) return null;
@@ -84,13 +85,16 @@ export function buildAdvisoryNotification(a: CalendarEvent, now: Date): Notifica
     title: a.title,
     detail: a.location,
     href: dayHref(a.startsAt),
-    at: created,
+    // Rank on when the advisory *applies*, not when it was detected — an
+    // advisory for a future day sits mid-pack; one already in effect gets
+    // the same urgency bump as anything else happening now.
+    at: applicableStart,
     expiresAt,
     dismissible: false,
   };
 }
 
-export function buildActionSoonNotification(e: CalendarEvent, now: Date): Notification {
+export function buildActionSoonNotification(e: CalendarEvent): Notification {
   const trigger = new Date(e.arrivalAt ?? e.startsAt).getTime();
   const mustBeSomewhere = e.busyStatus === "busy" && Boolean(e.location || e.arrivalAt);
   const when = e.arrivalAt
@@ -196,7 +200,7 @@ export function assembleNotifications(sources: NotificationSources, now: Date): 
     ...sources.advisories
       .map((a) => buildAdvisoryNotification(a, now))
       .filter((n): n is Notification => n !== null),
-    ...sources.actionsSoon.map((e) => buildActionSoonNotification(e, now)),
+    ...sources.actionsSoon.map((e) => buildActionSoonNotification(e)),
     ...sources.urgentTodos.map((t) => buildDeadlineNotification(t, now)),
     ...sources.systemItems.map((i) => buildSystemNotification(i, now)),
   ];

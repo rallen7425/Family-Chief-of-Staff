@@ -170,10 +170,11 @@ export async function getActionsSoon(withinHours: number): Promise<CalendarEvent
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
   return data.map(mapEvent).filter((event) => {
-    const trigger = new Date(event.arrivalAt ?? event.startsAt);
-    if (trigger.getTime() > horizon.getTime()) return false;
-    const end = event.endsAt ? new Date(event.endsAt) : new Date(event.startsAt);
-    return end.getTime() >= now.getTime();
+    // The "act on this" moment is the arrival time if there is one, else the
+    // start. Keep it only while that moment is still ahead and inside the
+    // window — once it has passed, the action window is over.
+    const trigger = new Date(event.arrivalAt ?? event.startsAt).getTime();
+    return trigger >= now.getTime() && trigger <= horizon.getTime();
   });
 }
 
