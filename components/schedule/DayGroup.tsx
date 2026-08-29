@@ -3,6 +3,7 @@ import { Bell } from "lucide-react";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
+import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 import { AdvisorySummary } from "@/components/schedule/AdvisorySummary";
 
 interface DayGroupProps {
@@ -79,9 +80,13 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
                       <p className="flex items-center gap-1.5 text-[14px] text-muted-text leading-tight">
                         <Bell size={13} className="shrink-0 text-muted-label" />
                         {event.title}
+                        <UnconfirmedTag status={event.status} />
                       </p>
                     ) : (
-                      <h4 className="font-semibold text-[16px] text-ink leading-tight mb-0.5">{event.title}</h4>
+                      <div className="flex items-start gap-1.5 flex-wrap mb-0.5">
+                        <h4 className="font-semibold text-[16px] text-ink leading-tight">{event.title}</h4>
+                        <UnconfirmedTag status={event.status} className="mt-0.5" />
+                      </div>
                     )}
                     {event.location && <p className="text-[13px] text-muted-label">{event.location}</p>}
                     <ArrivalBadge event={event} />

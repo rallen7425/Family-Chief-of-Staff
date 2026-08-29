@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Filter, Info } from "lucide-react";
-import { format, isToday, isTomorrow } from "date-fns";
+import { format } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_BG } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
+import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 
 interface ScheduleCardProps {
   events: CalendarEvent[];
@@ -25,23 +26,16 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
           <Filter size={18} />
         </Link>
       </div>
-      {events.length === 0 && <p className="text-[14px] text-muted-label">Nothing coming up.</p>}
+      {events.length === 0 && <p className="text-[14px] text-muted-label">Nothing left today.</p>}
       <div className="flex flex-col gap-6">
         {events.map((event) => {
           const isAdvisory = event.kind === "advisory";
           const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
           const startDate = new Date(event.startsAt);
-          // This preview shows the next few *upcoming* events, not strictly
-          // "today's" — without a day label, an event on a day with nothing
-          // scheduled today reads as if it's happening today.
-          const dayLabel = isToday(startDate) ? null : isTomorrow(startDate) ? "Tomorrow" : format(startDate, "EEE");
           return (
             <EventRow key={event.id} event={event} familyMembers={familyMembers}>
               <div className="flex gap-4 items-start relative">
                 <div className="w-14 shrink-0 text-right leading-tight pt-1">
-                  {dayLabel && (
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-primary">{dayLabel}</div>
-                  )}
                   <div className="text-[13px] text-muted-label font-medium">
                     {event.allDay ? "All day" : format(startDate, "h:mma").toLowerCase()}
                   </div>
@@ -56,9 +50,13 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
                     <p className="flex items-center gap-1.5 text-[15px] text-muted-text leading-tight">
                       <Info size={14} className="shrink-0 text-muted-label" />
                       {event.title}
+                      <UnconfirmedTag status={event.status} />
                     </p>
                   ) : (
-                    <h3 className="font-semibold text-[17px] text-ink leading-tight mb-1">{event.title}</h3>
+                    <div className="flex items-start gap-1.5 flex-wrap mb-1">
+                      <h3 className="font-semibold text-[17px] text-ink leading-tight">{event.title}</h3>
+                      <UnconfirmedTag status={event.status} className="mt-1" />
+                    </div>
                   )}
                   {event.location && <p className="text-[14px] text-muted-label">{event.location}</p>}
                 </div>

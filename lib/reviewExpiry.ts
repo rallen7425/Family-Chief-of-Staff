@@ -34,10 +34,14 @@ export interface ExpiryCheckable {
 }
 
 /**
- * True when the entry's date is before "now" in the household timezone:
- *  - task            → due date is before today (no due date never expires)
- *  - all-day schedule → its calendar day is before today
- *  - timed schedule   → its end (or start) instant is before now
+ * True when the entry is over, in the household timezone — so a never-
+ * confirmed entry drops out of the review queue once it can no longer
+ * be attended:
+ *  - task              → due date is before today (no due date never expires)
+ *  - all-day schedule  → its calendar day is before today
+ *  - timed w/ end time → its end instant is before now
+ *  - timed w/o end     → the end of its day is before now (don't drop a
+ *                        9am entry at 9:01 just because it has no end set)
  */
 export function isPastReviewEntry(entry: ExpiryCheckable, now: Date = new Date()): boolean {
   const today = householdDay(now);
@@ -46,13 +50,14 @@ export function isPastReviewEntry(entry: ExpiryCheckable, now: Date = new Date()
     return entry.dueDate != null && entry.dueDate < today;
   }
 
-  const ref = entry.endsAt ?? entry.startsAt;
-  if (!ref) return false;
-
   if (entry.allDay) {
-    return householdDay(new Date(ref)) < today;
+    const ref = entry.endsAt ?? entry.startsAt;
+    return ref != null && householdDay(new Date(ref)) < today;
   }
-  return new Date(ref).getTime() < now.getTime();
+
+  if (entry.endsAt) return new Date(entry.endsAt).getTime() < now.getTime();
+  if (entry.startsAt) return householdDay(new Date(entry.startsAt)) < today;
+  return false;
 }
 
 /** Convenience: keep only the entries that haven't passed yet. */

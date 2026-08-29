@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { startOfDay } from "date-fns";
+import { startOfDay, endOfDay } from "date-fns";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { isEventVisibleToViewer } from "@/lib/visibility";
@@ -73,6 +73,9 @@ export async function getEventsInRange(
     .select(SELECT_WITH_OWNERS)
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
+    // Unconfirmed (pending_review) entries stay on the calendar, tagged in
+    // the UI; only user-dismissed ones are hidden.
+    .neq("status", "dismissed")
     .gte("starts_at", start.toISOString())
     .lt("starts_at", end.toISOString())
     .order("starts_at")
@@ -95,13 +98,18 @@ export async function getEventsInRange(
   return attachReminders(events);
 }
 
-/** The Today screen's Schedule preview. Anchored to the start of the current
- * household day, not `now` — otherwise events earlier today drop off by
- * mid-morning and the card jumps ahead to the next day that has anything
- * (reading as "today's schedule is Monday" on a quiet Saturday). Server TZ
- * is pinned to the household zone in instrumentation.ts, so `startOfDay`
- * here is household-local midnight. */
-export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]> {
+/** The Today screen's Schedule preview: today's entries that haven't ended
+ * yet. Scoped to the current household day (server TZ is pinned in
+ * instrumentation.ts, so `startOfDay`/`endOfDay` are household-local), and
+ * an entry stays until its END time passes rather than dropping off the
+ * moment it starts — a 9am–11am practice is still shown at 10am. Entries
+ * with no end time run through the end of their day (all-day entries too).
+ * When nothing is left today the card shows its own empty state; it never
+ * rolls forward into tomorrow. */
+export async function getTodayScheduleEvents(limit: number): Promise<CalendarEvent[]> {
+  const now = new Date();
+  const dayStart = startOfDay(now);
+  const dayEnd = endOfDay(now);
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
@@ -109,12 +117,18 @@ export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]>
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
     .neq("status", "dismissed")
-    .gte("starts_at", startOfDay(new Date()).toISOString())
+    .gte("starts_at", dayStart.toISOString())
+    .lte("starts_at", dayEnd.toISOString())
     .order("starts_at")
-    .limit(limit)
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-  return attachReminders(data.map(mapEvent));
+
+  const notConcluded = (event: CalendarEvent) => {
+    if (event.allDay) return true;
+    const end = event.endsAt ? new Date(event.endsAt) : dayEnd;
+    return end.getTime() >= now.getTime();
+  };
+  return attachReminders(data.map(mapEvent).filter(notConcluded)).slice(0, limit);
 }
 
 /** Wrapped in cache() since the root layout (notification badge) and the

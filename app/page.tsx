@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { getActiveKeepInMindItems } from "@/lib/data/keepInMind";
-import { getPendingReviewEvents, getUpcomingEvents } from "@/lib/data/events";
+import { getPendingReviewEvents, getTodayScheduleEvents } from "@/lib/data/events";
 import { getIncompleteTodos, getUrgentTodos, getPendingReviewTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
@@ -17,7 +17,7 @@ export default async function TodayPage() {
     urgentTodos,
     pendingReviewEvents,
     pendingReviewTodos,
-    upcomingEvents,
+    todayEvents,
     todos,
     familyMembers,
     arrivalRules,
@@ -26,7 +26,7 @@ export default async function TodayPage() {
     getUrgentTodos(),
     getPendingReviewEvents(),
     getPendingReviewTodos(),
-    getUpcomingEvents(3),
+    getTodayScheduleEvents(3),
     getIncompleteTodos(3),
     getFamilyMembers(),
     getArrivalBufferRules(),
@@ -46,7 +46,7 @@ export default async function TodayPage() {
         pendingReviewCount={pendingReviewEvents.length + pendingReviewTodos.length}
       />
       <EntryEditingProvider arrivalRules={arrivalRules}>
-        <ScheduleCard events={upcomingEvents} familyMembers={familyMembers} />
+        <ScheduleCard events={todayEvents} familyMembers={familyMembers} />
       </EntryEditingProvider>
       <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
     </>

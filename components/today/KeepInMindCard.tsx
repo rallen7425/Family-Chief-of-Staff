@@ -14,13 +14,17 @@ interface KeepInMindCardProps {
   pendingReviewCount: number;
 }
 
+/** Hard cap on visible rows so the card can't push the Schedule card
+ * below the fold on mobile — the rest live behind "View all". */
+const MAX_VISIBLE = 4;
+
 /**
  * "Notifications" — a deliberately condensed strip: every entry (urgent
  * todos, system flags, and the pending-review count) is one compact,
  * tappable row with a small colored dot, no per-kind icon treatment and no
- * tinted sub-tile. It should read as clearly shorter than the Schedule card
- * below it — Schedule is the prominent one on this screen. "View all" (to
- * the full /notifications page) sits bottom-right on its own line.
+ * tinted sub-tile. Capped at four rows so Schedule (and at least its first
+ * item) stays visible on a phone without scrolling. "View all" (to the full
+ * /notifications page) sits bottom-right on its own line.
  */
 export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepInMindCardProps) {
   const today = format(new Date(), "yyyy-MM-dd");
@@ -46,6 +50,18 @@ export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepI
       : []),
   ];
 
+  // Keep the review nudge visible even when it would fall outside the cap —
+  // it's the one row that isn't also shown elsewhere on this screen.
+  const reviewRow = rows.find((row) => row.kind === "review");
+  const rest = rows.filter((row) => row.kind !== "review");
+  const visibleRows: Row[] =
+    rows.length <= MAX_VISIBLE
+      ? rows
+      : reviewRow
+        ? [...rest.slice(0, MAX_VISIBLE - 1), reviewRow]
+        : rest.slice(0, MAX_VISIBLE);
+  const hiddenCount = rows.length - visibleRows.length;
+
   return (
     <section className="bg-surface rounded-card pt-3 px-4 pb-2.5 shadow-sm shadow-black/5">
       <div className="flex items-center justify-between mb-1.5">
@@ -62,7 +78,7 @@ export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepI
       ) : (
         <>
           <div className="flex flex-col">
-            {rows.map((row) => {
+            {visibleRows.map((row) => {
               if (row.kind === "system") {
                 return <KeepInMindSystemRow key={`sys-${row.id}`} body={row.body} />;
               }
@@ -91,7 +107,7 @@ export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepI
               href="/notifications"
               className="text-[12px] font-semibold text-primary hover:underline"
             >
-              View all →
+              {hiddenCount > 0 ? `View all (${hiddenCount} more) →` : "View all →"}
             </Link>
           </div>
         </>

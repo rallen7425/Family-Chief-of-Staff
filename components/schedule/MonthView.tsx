@@ -10,7 +10,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_BG, ACCENT_BORDER } from "@/lib/colors";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -65,6 +65,18 @@ export function MonthView({ month, events, familyMembers, buildDayHref }: MonthV
               <div className="flex gap-0.5 h-1.5 items-center">
                 {realEvents.slice(0, 3).map((event) => {
                   const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
+                  // Unconfirmed entries read as a hollow dot rather than filled.
+                  if (event.status === "pending_review") {
+                    return (
+                      <span
+                        key={event.id}
+                        aria-label="Unconfirmed"
+                        className={`w-1.5 h-1.5 rounded-full border ${
+                          member ? ACCENT_BORDER[member.accentColor] : "border-muted-label"
+                        }`}
+                      />
+                    );
+                  }
                   return (
                     <span
                       key={event.id}

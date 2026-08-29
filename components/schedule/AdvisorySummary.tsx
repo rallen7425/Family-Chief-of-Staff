@@ -4,6 +4,7 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { ChevronDown, Info } from "lucide-react";
 import { EventRow } from "@/components/events/EventRow";
+import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 
 interface AdvisorySummaryProps {
@@ -48,7 +49,10 @@ export function AdvisorySummary({ advisories, familyMembers }: AdvisorySummaryPr
                   {advisory.allDay ? "All day" : format(new Date(advisory.startsAt), "h:mma").toLowerCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[14px] text-muted-text leading-tight">{advisory.title}</p>
+                  <p className="text-[14px] text-muted-text leading-tight">
+                    {advisory.title}
+                    <UnconfirmedTag status={advisory.status} className="ml-1.5 align-middle" />
+                  </p>
                   {advisory.location && (
                     <p className="text-[12px] text-muted-label mt-0.5">{advisory.location}</p>
                   )}

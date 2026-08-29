@@ -50,16 +50,13 @@ describe("isPastReviewEntry — all-day schedule entries", () => {
 });
 
 describe("isPastReviewEntry — timed schedule entries", () => {
-  it("is past once the start instant has gone by", () => {
+  it("is past once the end time has gone by", () => {
     expect(
-      isPastReviewEntry({ kind: "event", startsAt: "2026-08-28T13:00:00.000Z", allDay: false }, NOW)
+      isPastReviewEntry(
+        { kind: "event", startsAt: "2026-08-28T12:00:00.000Z", endsAt: "2026-08-28T13:00:00.000Z", allDay: false },
+        NOW
+      )
     ).toBe(true);
-  });
-
-  it("is not past when it starts later today", () => {
-    expect(
-      isPastReviewEntry({ kind: "event", startsAt: "2026-08-28T22:00:00.000Z", allDay: false }, NOW)
-    ).toBe(false);
   });
 
   it("stays until it ends when an end time is set", () => {
@@ -68,6 +65,24 @@ describe("isPastReviewEntry — timed schedule entries", () => {
         { kind: "event", startsAt: "2026-08-28T13:00:00.000Z", endsAt: "2026-08-28T21:00:00.000Z", allDay: false },
         NOW
       )
+    ).toBe(false);
+  });
+
+  it("with no end time, is not past just because it has started — runs through its day", () => {
+    expect(
+      isPastReviewEntry({ kind: "event", startsAt: "2026-08-28T13:00:00.000Z", allDay: false }, NOW)
+    ).toBe(false);
+  });
+
+  it("with no end time, is past once its day is over", () => {
+    expect(
+      isPastReviewEntry({ kind: "event", startsAt: "2026-08-27T13:00:00.000Z", allDay: false }, NOW)
+    ).toBe(true);
+  });
+
+  it("is not past when it starts later today", () => {
+    expect(
+      isPastReviewEntry({ kind: "event", startsAt: "2026-08-28T22:00:00.000Z", allDay: false }, NOW)
     ).toBe(false);
   });
 
