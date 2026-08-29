@@ -18,19 +18,17 @@ not a convention to follow.
 ## Session status (2026-08-29) — Today-screen polish + Notifications system
 
 Two threads: a running list of Today-screen feedback, then a full "build a proper
-Notifications page" feature. **All code complete, verified, merged to `main` — NOT
-pushed, NOT deployed.**
+Notifications page" feature. **Complete, verified, pushed, and deployed to production.**
 
-### Deploy / branch state — READ THIS FIRST
+### Deploy / branch state
 
 | | |
 |---|---|
-| **Production** | Running `6db8106` (deployment `dpl_C8UxtRCYZZ3hRHSVji6Gfwfv7Ccs`) = review past-entry filter + the first condensed Notifications tile only. **Prod is well behind `main`.** |
-| **`family-chief-of-staff` `main`** | `3860a22`, **5 commits ahead of `origin/main`**: `3c75f27`, `9f0d9e1` (Today polish), `a5d69ef` (a status note), `f7d2d47` + `3860a22` (notifications system A–C, D–F). Green: tsc / eslint / **100 tests** / `next build`. |
-| **`rocky-coast-labs` `main`** | `1b17f16`, **3 commits ahead of `origin/main`**: `c3b9f49` + `a388e16` (P0/P1 migrations) + `1b17f16` (notifications migration). **All three migrations are applied to the shared DB**; just not pushed to GitHub. |
+| **Production** | `dpl_ACnthCXEyXnPc3tcQs1Pq6qFvb7V` (READY, aliased `family-chief-of-staff.vercel.app`) — deployed from `main` @ `2ca5012`. Smoke-checked: all routes 200, `/notifications` renders the new Important / More / review sections. |
+| **`family-chief-of-staff`** | `main` @ `2ca5012`, pushed to `origin`. Green: tsc / eslint / **100 tests** / `next build`. |
+| **`rocky-coast-labs`** | `main` @ `1b17f16`, pushed to `origin`. All three migrations (`c3b9f49`, `a388e16` P0/P1 + `1b17f16` notifications) applied to the shared DB. |
 | **Feature branches** | `notifications-system` in both repos — merged (fast-forward) and deleted. |
 | **Plan file** | `~/.claude/plans/quizzical-dreaming-hare.md` — the full approved design. |
-| **Next step** | `git push` both repos + `vercel --prod` (user gates this; run when they say go). |
 
 ### Thread 1 — Today-screen fixes (`3c75f27`, `9f0d9e1`)
 
