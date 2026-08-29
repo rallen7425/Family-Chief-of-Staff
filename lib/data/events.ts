@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { startOfDay } from "date-fns";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { isEventVisibleToViewer } from "@/lib/visibility";
@@ -94,6 +95,12 @@ export async function getEventsInRange(
   return attachReminders(events);
 }
 
+/** The Today screen's Schedule preview. Anchored to the start of the current
+ * household day, not `now` — otherwise events earlier today drop off by
+ * mid-morning and the card jumps ahead to the next day that has anything
+ * (reading as "today's schedule is Monday" on a quiet Saturday). Server TZ
+ * is pinned to the household zone in instrumentation.ts, so `startOfDay`
+ * here is household-local midnight. */
 export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -101,7 +108,8 @@ export async function getUpcomingEvents(limit: number): Promise<CalendarEvent[]>
     .select(SELECT_WITH_OWNERS)
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
-    .gte("starts_at", new Date().toISOString())
+    .neq("status", "dismissed")
+    .gte("starts_at", startOfDay(new Date()).toISOString())
     .order("starts_at")
     .limit(limit)
     .returns<EntryRowWithOwners[]>();
