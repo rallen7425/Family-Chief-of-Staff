@@ -12,6 +12,7 @@ export interface EntryRowInsert {
   location_text: string | null;
   busy_status: "busy" | "free";
   scope: "personal" | "family";
+  is_critical: boolean;
   category: string | null;
   starts_at: string | null;
   ends_at: string | null;
@@ -63,6 +64,7 @@ export function buildEntryRows({ input, sourceType, sourceDetail, status = "conf
     location_text: input.location?.trim() || null,
     busy_status: input.busyStatus,
     scope: input.scope,
+    is_critical: input.isCritical,
     category: input.category?.trim() || null,
     is_all_day: input.allDay,
     linked_entry_id: input.linkedEntryId ?? null,

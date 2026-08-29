@@ -18,6 +18,7 @@ function mapTodo(row: EntryRowWithOwners): Todo {
     dueDate: row.due_at ?? undefined,
     notes: row.notes ?? undefined,
     completed: row.completed_at != null,
+    isCritical: row.is_critical ?? false,
     status: row.status,
     sourceType: row.source_type,
     sourceDetail: row.source_detail ?? undefined,

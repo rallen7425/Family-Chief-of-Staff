@@ -35,6 +35,11 @@ const ExtractedItemSchema = z.object({
     .nullable()
     .describe("Classify events/reminders into this fixed vocabulary. Null for tasks/advisories or when genuinely unclear."),
   location: z.string().nullable().describe("A place name or address, when stated. Put it here, not in notes."),
+  is_critical: z
+    .boolean()
+    .describe(
+      "true ONLY for school/office closures, event cancellations, safety alerts, weather emergencies, or a hard deadline that falls on the same day. false for every routine event, practice, game, appointment, reminder, or ordinary deadline. When unsure, false."
+    ),
   notes: z.string().nullable().describe("Anything relevant that doesn't fit a structured field above."),
   source_excerpt: z.string().describe("The exact quoted snippet that justifies this item"),
   source: z.enum(["body", "attachment"]),

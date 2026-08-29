@@ -54,6 +54,7 @@ function toInitialValues(event: CalendarEvent): EntryFormInitialValues {
     arrivalTime: event.arrivalAt ? format(new Date(event.arrivalAt), "HH:mm") : "",
     arrivalSource: event.arrivalSource ?? "",
     busyStatus: event.busyStatus,
+    isCritical: event.isCritical,
     location: event.location ?? "",
     notes: event.notes ?? "",
     linkedEntryId: event.linkedEntryId ?? "",

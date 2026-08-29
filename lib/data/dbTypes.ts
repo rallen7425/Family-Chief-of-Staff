@@ -35,6 +35,7 @@ export interface EntryRow {
   recurrence_id: string | null;
   recurrence_until: string | null; // YYYY-MM-DD
   linked_entry_id: string | null;
+  is_critical: boolean;
   status: ItemStatus;
   completed_at: string | null;
   source_type: SourceType;
@@ -60,4 +61,11 @@ export interface MemberEmailDomainRow {
   id: string;
   family_member_id: string;
   domain: string;
+}
+
+/** `family_chief_of_staff.notification_dismissals` — household-wide
+ * "dismissed" state for a derived notification, keyed by its stable id. */
+export interface NotificationDismissalRow {
+  notification_id: string;
+  dismissed_at: string;
 }

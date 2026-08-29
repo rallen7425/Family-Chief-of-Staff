@@ -134,6 +134,7 @@ export async function writeExtractedItems(
         arrival_at: arrivalAt,
         arrival_source: arrivalSource,
         busy_status: kind === "event" ? "busy" : "free",
+        is_critical: item.is_critical ?? false,
         scope: subject?.isAdult ? "personal" : "family",
         status: "pending_review",
         source_type: "email_scan",

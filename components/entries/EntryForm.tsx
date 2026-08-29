@@ -28,6 +28,7 @@ export interface EntryFormInitialValues {
   arrivalTime: string;
   arrivalSource: ArrivalSource | "";
   busyStatus: "busy" | "free";
+  isCritical: boolean;
   location: string;
   notes: string;
   linkedEntryId: string;
@@ -74,6 +75,7 @@ function defaults(v?: Partial<EntryFormInitialValues>): EntryFormInitialValues {
     arrivalTime: v?.arrivalTime ?? "",
     arrivalSource: v?.arrivalSource ?? "",
     busyStatus: v?.busyStatus ?? "busy",
+    isCritical: v?.isCritical ?? false,
     location: v?.location ?? "",
     notes: v?.notes ?? "",
     linkedEntryId: v?.linkedEntryId ?? "",
@@ -107,6 +109,7 @@ export function EntryForm({
   const [arrivalTime, setArrivalTime] = useState(init.arrivalTime);
   const [arrivalSource, setArrivalSource] = useState<ArrivalSource | "">(init.arrivalSource);
   const [busyStatus, setBusyStatus] = useState<"busy" | "free">(init.busyStatus);
+  const [isCritical, setIsCritical] = useState(init.isCritical);
   const [location, setLocation] = useState(init.location);
   const [notes, setNotes] = useState(init.notes);
   const [linkedEntryId, setLinkedEntryId] = useState(init.linkedEntryId);
@@ -204,6 +207,7 @@ export function EntryForm({
       ownerMemberIds: showOwner ? ownerMemberIds : [],
       scope: subjectIsAdult && !isAdvisory ? "personal" : "family",
       busyStatus: isEvent ? busyStatus : "free",
+      isCritical,
       category: showCategory ? category || null : null,
       notes: notes.trim() || null,
       location: showLocation ? location.trim() || null : null,
@@ -465,6 +469,25 @@ export function EntryForm({
           <p className="mt-1 text-[12px] text-muted-label">Only busy entries are checked for scheduling conflicts.</p>
         </div>
       )}
+
+      <div>
+        <label className={FORM_LABEL_CLASS}>Priority</label>
+        <button
+          type="button"
+          onClick={() => setIsCritical((v) => !v)}
+          aria-pressed={isCritical}
+          className={`w-full py-2 rounded-pill text-[13px] font-semibold transition-colors ${
+            isCritical
+              ? "bg-accent-berry text-white"
+              : "bg-mist text-muted-text border border-border hover:bg-border/40"
+          }`}
+        >
+          {isCritical ? "Critical" : "Mark as critical"}
+        </button>
+        <p className="mt-1 text-[12px] text-muted-label">
+          Critical entries surface above other notifications on the Today screen.
+        </p>
+      </div>
 
       {showLocation && (
         <div>

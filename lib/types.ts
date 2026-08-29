@@ -62,6 +62,9 @@ export interface CalendarEvent {
   notes?: string;
   arrivalAt?: string; // ISO datetime
   arrivalSource?: ArrivalSource;
+  /** Forces any notification derived from this entry to "critical" severity.
+   * Set by the email-scan extractor or the entry form's Critical toggle. */
+  isCritical: boolean;
   status: ItemStatus;
   sourceType: SourceType;
   sourceDetail?: SourceDetail;
@@ -85,6 +88,7 @@ export interface Todo {
   dueDate?: string; // YYYY-MM-DD
   notes?: string;
   completed: boolean;
+  isCritical: boolean;
   status: ItemStatus;
   sourceType: SourceType;
   sourceDetail?: SourceDetail;
@@ -100,6 +104,7 @@ export interface EntryInput {
   ownerMemberIds: string[];
   scope: EntryScope;
   busyStatus: BusyStatus;
+  isCritical: boolean;
   category?: string | null;
   notes?: string | null;
   location?: string | null;

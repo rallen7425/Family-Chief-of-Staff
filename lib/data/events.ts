@@ -35,6 +35,7 @@ function mapEvent(row: EntryRowWithOwners): CalendarEvent {
     notes: row.notes ?? undefined,
     arrivalAt: row.arrival_at ?? undefined,
     arrivalSource: row.arrival_source ?? undefined,
+    isCritical: row.is_critical ?? false,
     status: row.status,
     sourceType: row.source_type,
     sourceDetail: row.source_detail ?? undefined,
@@ -129,6 +130,51 @@ export async function getTodayScheduleEvents(limit: number): Promise<CalendarEve
     return end.getTime() >= now.getTime();
   };
   return attachReminders(data.map(mapEvent).filter(notConcluded)).slice(0, limit);
+}
+
+/** Confirmed advisories, for the notifications feed. Time-bounding (show
+ * for ~24h from detection) is applied in lib/notifications.ts, not here. */
+export async function getActiveAdvisories(): Promise<CalendarEvent[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("entries")
+    .select(SELECT_WITH_OWNERS)
+    .eq("kind", "advisory")
+    .eq("status", "confirmed")
+    .order("created_at", { ascending: false })
+    .returns<EntryRowWithOwners[]>();
+  if (error) throw error;
+  return data.map(mapEvent);
+}
+
+/** Confirmed events/reminders whose start (or arrival time, if set) lands in
+ * the next `withinHours` and haven't already ended — the "act on this soon"
+ * notification source. */
+export async function getActionsSoon(withinHours: number): Promise<CalendarEvent[]> {
+  const now = new Date();
+  const horizon = new Date(now.getTime() + withinHours * 60 * 60 * 1000);
+  // Query a slightly wider window than the horizon so an entry whose
+  // arrival_at is inside the window but whose start is just past it still
+  // gets considered; the JS filter below is authoritative.
+  const queryEnd = new Date(horizon.getTime() + 3 * 60 * 60 * 1000);
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("entries")
+    .select(SELECT_WITH_OWNERS)
+    .in("kind", ["event", "reminder"])
+    .eq("status", "confirmed")
+    .not("starts_at", "is", null)
+    .gte("starts_at", startOfDay(now).toISOString())
+    .lte("starts_at", queryEnd.toISOString())
+    .order("starts_at")
+    .returns<EntryRowWithOwners[]>();
+  if (error) throw error;
+  return data.map(mapEvent).filter((event) => {
+    const trigger = new Date(event.arrivalAt ?? event.startsAt);
+    if (trigger.getTime() > horizon.getTime()) return false;
+    const end = event.endsAt ? new Date(event.endsAt) : new Date(event.startsAt);
+    return end.getTime() >= now.getTime();
+  });
 }
 
 /** Wrapped in cache() since the root layout (notification badge) and the

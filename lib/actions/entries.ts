@@ -104,6 +104,7 @@ export async function updateEntry(id: string, rawInput: EntryInput): Promise<{ e
       subject_member_id: input.subjectMemberId,
       scope: input.scope,
       busy_status: input.busyStatus,
+      is_critical: input.isCritical,
       category: input.category?.trim() || null,
       notes: input.notes?.trim() || null,
       location_text: input.location?.trim() || null,
