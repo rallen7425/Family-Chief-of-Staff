@@ -15,6 +15,91 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-08-29) — Today/Notifications polish + Notifications system (IN PROGRESS)
+
+Driven by a running list of user feedback on the Today screen, then a larger
+"build a proper Notifications page" request that is **mid-implementation**.
+
+### Deploy / branch state — READ THIS FIRST
+
+| | |
+|---|---|
+| **Production** | Running `6db8106` (deployment `dpl_C8UxtRCYZZ3hRHSVji6Gfwfv7Ccs`). = the review past-entry filter + the condensed Notifications tile only. |
+| **`main`, committed but NOT pushed / NOT deployed** | `3c75f27` + `9f0d9e1` (2 commits ahead of `origin/main`). These are green (tsc/eslint/78 tests/build) and ready to ship — the session ended before the user said "push/deploy". **Prod is missing them.** |
+| **WIP branch `notifications-system`** (in BOTH `family-chief-of-staff` @ `03d65b1` and `rocky-coast-labs` @ `1b17f16`) | Notifications system, Parts A–C of the plan. tsc + 78 tests green; `lib/notifications.ts` isn't imported anywhere yet so it's inert. |
+| **Plan file** | `~/.claude/plans/quizzical-dreaming-hare.md` — the full approved design. |
+
+### Shipped earlier this session (in `3c75f27` / `9f0d9e1`, on `main`, undeployed)
+
+- **`06651ec` (deployed):** `lib/reviewExpiry.ts` — past-dated entries drop out of `/review`
+  and the badge counts (view-time filter; end-time aware). 17 tests.
+- **`6db8106` (deployed):** "Keep in mind" → "Notifications" tile — condensed rows with
+  severity-less dots, pending-review as a plain row, footer "View all →" `/notifications`;
+  `ScheduleCard`/`NeedsDoingCard` footer links moved. Built against the `Today` artboard in
+  `design/mockups/event-redesign-prototype.html`.
+- **`3c75f27`:** Today schedule preview anchored to `startOfDay` not `now`.
+- **`9f0d9e1`:** `getUpcomingEvents` → `getTodayScheduleEvents` (today-only, keep an entry
+  until its **end time**, all-day/no-end run through end of day, empty state — never rolls to
+  tomorrow); `UnconfirmedTag` on `pending_review` entries across DayGroup / ScheduleCard /
+  AdvisorySummary + hollow dot in MonthView; `getEventsInRange` + Today preview now
+  `neq status dismissed`; `reviewExpiry` refined (no-end timed entry runs through its day);
+  Notifications tile hard-capped at 4 rows (review row pinned); "Needs Doing" → "To Do".
+
+Also: investigated the "X on `/review` removes the whole group" report — **not reproducible**
+on current code (verified UI + DB); the per-row X already dismisses exactly one entry.
+
+### Notifications system — plan + progress
+
+Full spec: `~/.claude/plans/quizzical-dreaming-hare.md`. User decisions: **Critical = BOTH**
+a stored `entries.is_critical` flag (extractor + form toggle) **and** rule-based promotion;
+**dismiss = yes** (a store + X, advisories/review never dismissible); **tile/page "Important"
+= exact parity** via `IMPORTANT_LIMIT` (not a hard constraint).
+
+**Done (Parts A–C, on branch `notifications-system`):**
+- **A — migration** `rocky-coast-labs/supabase/migrations/20260829000001_family_chief_of_staff_notifications.sql`:
+  `entries.is_critical bool default false` + `notification_dismissals(notification_id text pk, dismissed_at)`.
+  **NOT APPLIED** — `supabase db push` was classifier-blocked in-session; needs the user (or an
+  interactive run) from `rocky-coast-labs/` with no env override.
+- **B — `is_critical` end-to-end:** `lib/types.ts` (`CalendarEvent`/`Todo`/`EntryInput`),
+  `dbTypes.ts` (`EntryRow` + `NotificationDismissalRow`), `mapEvent`/`mapTodo`,
+  `recurrence.ts` insert shape, `updateEntry`, `EntryForm` "Critical" toggle (berry pill) +
+  `EntryDetailsModal.toInitialValues`, `extractEvents.ts` zod schema, `write.ts` insert.
+- **C — `lib/notifications.ts`:** `Notification` model, pure builders
+  (`buildReviewNudge`/`buildAdvisoryNotification`/`buildActionSoonNotification`/
+  `buildDeadlineNotification`/`buildSystemNotification`), `rankNotifications`
+  (severity weight + urgency bonus + kind tiebreak), `assembleNotifications` (pure, for tests),
+  `getRankedNotifications` (`cache()`). Sources: `getActiveAdvisories` + `getActionsSoon(6)`
+  (new in `lib/data/events.ts`), `getUrgentTodos`, `getActiveKeepInMindItems` (table empty in
+  prod), `getPendingReview*`, `getNotificationDismissals` (new `lib/data/notifications.ts`).
+
+**Remaining (Parts D–F):**
+1. Apply the migration; confirm the column + table via a REST read.
+2. **D** — `lib/actions/notifications.ts`: `dismissNotification(id)` → upsert + revalidate `/`,`/notifications`.
+3. **E** — rewrite `app/notifications/page.tsx` (Review / Important / More sections, severity
+   dots `critical→accent-berry` / `high→primary` / `normal→muted-text`, dismiss X on
+   `dismissible` rows, empty state); rewrite `components/today/KeepInMindCard.tsx` to consume
+   `getRankedNotifications()` (drop `items`/`urgentTodos`/`pendingReviewCount` props); update
+   `app/page.tsx` to pass it. New `components/notifications/NotificationRow.tsx` +
+   `NotificationDismissButton.tsx` (client, `useTransition`).
+4. **F** — `lib/notifications.test.ts` (advisory 24h boundary, action-soon 6h, `is_critical` →
+   critical from each source, busy+located imminent → critical, overdue todo → high, ranking
+   order, `important`/`more` split, dismissed-id filtered but advisory not).
+5. Verify (tsc/eslint/test/build + browser), merge `notifications-system` → `main`, then
+   decide push/deploy for the whole stack (`3c75f27` … through the notifications work).
+
+**Follow-ups noted in the plan:** chat `create_event_draft` gaining `is_critical`; un-dismiss
+UI + a cleanup sweep for stale `notification_dismissals`; a real generator for
+`keep_in_mind_items`.
+
+### Local dev reminder
+
+Global `node` is v20; the repo needs ≥22. Use `/opt/homebrew/bin/node` (v26):
+`PATH="/opt/homebrew/bin:$PATH" npx vitest run` / `tsc` / `node_modules/.bin/next dev`.
+No local DB — `.env.local` points at prod Supabase; read-only REST checks via
+`curl "$SUPABASE_URL/rest/v1/..." -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "Accept-Profile: family_chief_of_staff"`.
+
+---
+
 ## Session status (2026-08-28) — Event/Task/Reminder/Advisory redesign (P0 + P1)
 
 Working from `claude-code-implementation-prompt.md` (in the repo root, untracked):
