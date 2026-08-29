@@ -1,19 +1,12 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { Bell, Cloud, Bookmark, Package, CircleAlert, ChevronRight } from "lucide-react";
 import type { KeepInMindItem, Todo } from "@/lib/types";
-
-const ICONS = {
-  weather: Cloud,
-  reminder: Bookmark,
-  package: Package,
-} as const;
-
-const MAX_VISIBLE = 3;
+import { KeepInMindSystemRow } from "@/components/today/KeepInMindSystemRow";
 
 type Row =
-  | { kind: "system"; id: string; icon: KeepInMindItem["icon"]; body: string }
-  | { kind: "todo"; id: string; body: string; overdue: boolean };
+  | { kind: "todo"; id: string; body: string; overdue: boolean }
+  | { kind: "system"; id: string; body: string }
+  | { kind: "review"; id: string; body: string };
 
 interface KeepInMindCardProps {
   items: KeepInMindItem[];
@@ -21,6 +14,14 @@ interface KeepInMindCardProps {
   pendingReviewCount: number;
 }
 
+/**
+ * "Notifications" — a deliberately condensed strip: every entry (urgent
+ * todos, system flags, and the pending-review count) is one compact,
+ * tappable row with a small colored dot, no per-kind icon treatment and no
+ * tinted sub-tile. It should read as clearly shorter than the Schedule card
+ * below it — Schedule is the prominent one on this screen. "View all" (to
+ * the full /notifications page) sits bottom-right on its own line.
+ */
 export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepInMindCardProps) {
   const today = format(new Date(), "yyyy-MM-dd");
 
@@ -31,68 +32,69 @@ export function KeepInMindCard({ items, urgentTodos, pendingReviewCount }: KeepI
       body: todo.title,
       overdue: Boolean(todo.dueDate && todo.dueDate < today),
     })),
-    ...items.map((item) => ({ kind: "system" as const, id: item.id, icon: item.icon, body: item.body })),
+    ...items.map((item) => ({ kind: "system" as const, id: item.id, body: item.body })),
+    ...(pendingReviewCount > 0
+      ? [
+          {
+            kind: "review" as const,
+            id: "review",
+            body: `${pendingReviewCount} new ${
+              pendingReviewCount === 1 ? "entry needs" : "entries need"
+            } approval`,
+          },
+        ]
+      : []),
   ];
 
-  const visibleRows = rows.slice(0, MAX_VISIBLE);
-  const hasMore = rows.length > MAX_VISIBLE;
-  const hasContent = rows.length > 0 || pendingReviewCount > 0;
-
   return (
-    <section className="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
-      <div className="flex items-center gap-2 mb-5">
-        <Bell size={18} className="text-muted-text" />
-        <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase">
-          Keep in mind
-        </h2>
+    <section className="bg-surface rounded-card pt-3 px-4 pb-2.5 shadow-sm shadow-black/5">
+      <div className="flex items-center justify-between mb-1.5">
+        <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase">Notifications</h2>
+        {rows.length > 0 && (
+          <span className="text-[10px] font-bold text-primary bg-primary/10 rounded-full min-w-[16px] text-center px-1.5 py-px">
+            {rows.length}
+          </span>
+        )}
       </div>
 
-      {!hasContent && <p className="text-[14px] text-muted-label">Nothing to flag right now.</p>}
-
-      {visibleRows.length > 0 && (
-        <ul className="flex flex-col gap-4">
-          {visibleRows.map((row) => {
-            if (row.kind === "todo") {
+      {rows.length === 0 ? (
+        <p className="text-[14px] text-muted-label">Nothing to flag right now.</p>
+      ) : (
+        <>
+          <div className="flex flex-col">
+            {rows.map((row) => {
+              if (row.kind === "system") {
+                return <KeepInMindSystemRow key={`sys-${row.id}`} body={row.body} />;
+              }
+              const href = row.kind === "review" ? "/review" : "/todo";
+              const dotClass =
+                row.kind === "review"
+                  ? "bg-primary"
+                  : row.kind === "todo" && row.overdue
+                    ? "bg-accent-berry"
+                    : "bg-muted-text";
               return (
-                <li key={`todo-${row.id}`} className="flex items-start gap-3">
-                  <CircleAlert
-                    size={20}
-                    className={`mt-[1px] shrink-0 ${row.overdue ? "text-accent-berry" : "text-muted-text"}`}
-                  />
-                  <span className="text-[15px] font-medium leading-relaxed text-ink">{row.body}</span>
-                </li>
+                <Link
+                  key={`${row.kind}-${row.id}`}
+                  href={href}
+                  className="w-full flex items-center gap-[9px] py-[5px]"
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
+                  <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-ink">{row.body}</span>
+                </Link>
               );
-            }
-            const Icon = ICONS[row.icon];
-            return (
-              <li key={`sys-${row.id}`} className="flex items-start gap-3">
-                <Icon size={20} className="text-muted-text mt-[1px] shrink-0" />
-                <span className="text-[15px] font-medium leading-relaxed text-ink">{row.body}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+            })}
+          </div>
 
-      {hasMore && (
-        <Link href="/todo" className="inline-block mt-4 text-[13px] font-semibold text-primary hover:underline">
-          View all →
-        </Link>
-      )}
-
-      {pendingReviewCount > 0 && (
-        <Link
-          href="/review"
-          className={`flex items-center justify-between gap-2 rounded-input bg-primary/5 px-3.5 py-3 text-[14px] font-medium text-ink hover:bg-primary/10 transition-colors ${
-            rows.length > 0 ? "mt-5" : ""
-          }`}
-        >
-          <span>
-            <span className="font-semibold text-primary">{pendingReviewCount}</span>{" "}
-            new {pendingReviewCount === 1 ? "entry needs" : "entries need"} approval
-          </span>
-          <ChevronRight size={18} className="text-primary shrink-0" />
-        </Link>
+          <div className="flex justify-end mt-0.5">
+            <Link
+              href="/notifications"
+              className="text-[12px] font-semibold text-primary hover:underline"
+            >
+              View all →
+            </Link>
+          </div>
+        </>
       )}
     </section>
   );

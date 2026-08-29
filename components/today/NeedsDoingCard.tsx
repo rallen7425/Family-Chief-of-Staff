@@ -13,11 +13,8 @@ export function NeedsDoingCard({ todos, familyMembers }: NeedsDoingCardProps) {
 
   return (
     <section className="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
-      <div className="flex justify-between items-center mb-6">
+      <div className="mb-6">
         <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase">Needs Doing</h2>
-        <Link href="/todo" className="text-[13px] font-semibold text-primary hover:underline">
-          See all
-        </Link>
       </div>
       {todos.length === 0 && <p className="text-[14px] text-muted-label">All caught up.</p>}
       <div className="flex flex-col gap-5">
@@ -45,6 +42,11 @@ export function NeedsDoingCard({ todos, familyMembers }: NeedsDoingCardProps) {
             </div>
           );
         })}
+      </div>
+      <div className="flex justify-end mt-3.5">
+        <Link href="/todo" className="text-[13px] font-semibold text-primary hover:underline">
+          View all →
+        </Link>
       </div>
     </section>
   );

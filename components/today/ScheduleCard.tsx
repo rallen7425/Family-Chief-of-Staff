@@ -17,18 +17,13 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
     <section className="bg-surface rounded-card p-6 shadow-sm shadow-black/5">
       <div className="mb-6 flex justify-between items-center">
         <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase">Schedule</h2>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/schedule"
-            aria-label="Filter"
-            className="text-muted-text hover:text-primary transition-colors"
-          >
-            <Filter size={18} />
-          </Link>
-          <Link href="/schedule" className="text-[13px] font-semibold text-primary hover:underline">
-            View Calendar
-          </Link>
-        </div>
+        <Link
+          href="/schedule"
+          aria-label="Filter"
+          className="text-muted-text hover:text-primary transition-colors"
+        >
+          <Filter size={18} />
+        </Link>
       </div>
       {events.length === 0 && <p className="text-[14px] text-muted-label">Nothing coming up.</p>}
       <div className="flex flex-col gap-6">
@@ -71,6 +66,11 @@ export function ScheduleCard({ events, familyMembers }: ScheduleCardProps) {
             </EventRow>
           );
         })}
+      </div>
+      <div className="flex justify-end mt-4">
+        <Link href="/schedule" className="text-[13px] font-semibold text-primary hover:underline">
+          View Schedule →
+        </Link>
       </div>
     </section>
   );
