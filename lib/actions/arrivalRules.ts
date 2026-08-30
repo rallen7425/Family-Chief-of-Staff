@@ -8,7 +8,7 @@ function clampBuffer(minutes: number): number {
 }
 
 function revalidate() {
-  revalidatePath("/settings");
+  revalidatePath("/settings/arrival");
 }
 
 export async function createArrivalRule(input: {
