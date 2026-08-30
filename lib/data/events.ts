@@ -1,9 +1,10 @@
 import { cache } from "react";
-import { startOfDay, endOfDay } from "date-fns";
+import { addDays, startOfDay, endOfDay } from "date-fns";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { isEventVisibleToViewer } from "@/lib/visibility";
 import { dropPastReviewEntries } from "@/lib/reviewExpiry";
+import { buildSchedulePreview, type SchedulePreview } from "@/lib/schedulePreview";
 import type { CalendarEvent } from "@/lib/types";
 import type { EntryRow } from "@/lib/data/dbTypes";
 
@@ -99,18 +100,13 @@ export async function getEventsInRange(
   return attachReminders(events);
 }
 
-/** The Today screen's Schedule preview: today's entries that haven't ended
- * yet. Scoped to the current household day (server TZ is pinned in
- * instrumentation.ts, so `startOfDay`/`endOfDay` are household-local), and
- * an entry stays until its END time passes rather than dropping off the
- * moment it starts — a 9am–11am practice is still shown at 10am. Entries
- * with no end time run through the end of their day (all-day entries too).
- * When nothing is left today the card shows its own empty state; it never
- * rolls forward into tomorrow. */
-export async function getTodayScheduleEvents(limit: number): Promise<CalendarEvent[]> {
+/** The Today screen's Schedule card. Today's remaining entries, rolling
+ * forward one day when today is light (see `buildSchedulePreview`). Queries
+ * a 3-day window so the "nothing for the next two days" case can be
+ * detected. Server TZ is pinned in instrumentation.ts, so the day math is
+ * household-local. */
+export async function getTodaySchedulePreview(): Promise<SchedulePreview> {
   const now = new Date();
-  const dayStart = startOfDay(now);
-  const dayEnd = endOfDay(now);
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
@@ -118,18 +114,12 @@ export async function getTodayScheduleEvents(limit: number): Promise<CalendarEve
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
     .neq("status", "dismissed")
-    .gte("starts_at", dayStart.toISOString())
-    .lte("starts_at", dayEnd.toISOString())
+    .gte("starts_at", startOfDay(now).toISOString())
+    .lte("starts_at", endOfDay(addDays(now, 2)).toISOString())
     .order("starts_at")
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-
-  const notConcluded = (event: CalendarEvent) => {
-    if (event.allDay) return true;
-    const end = event.endsAt ? new Date(event.endsAt) : dayEnd;
-    return end.getTime() >= now.getTime();
-  };
-  return attachReminders(data.map(mapEvent).filter(notConcluded)).slice(0, limit);
+  return buildSchedulePreview(attachReminders(data.map(mapEvent)), now);
 }
 
 /** Confirmed advisories, for the notifications feed. Time-bounding (show

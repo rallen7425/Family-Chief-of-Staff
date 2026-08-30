@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { getTodayScheduleEvents } from "@/lib/data/events";
+import { getTodaySchedulePreview } from "@/lib/data/events";
 import { getIncompleteTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
@@ -12,9 +12,9 @@ import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [notifications, todayEvents, todos, familyMembers, arrivalRules] = await Promise.all([
+  const [notifications, schedulePreview, todos, familyMembers, arrivalRules] = await Promise.all([
     getRankedNotifications(),
-    getTodayScheduleEvents(3),
+    getTodaySchedulePreview(),
     getIncompleteTodos(3),
     getFamilyMembers(),
     getArrivalBufferRules(),
@@ -30,7 +30,7 @@ export default async function TodayPage() {
       </div>
       <KeepInMindCard notifications={notifications} />
       <EntryEditingProvider arrivalRules={arrivalRules}>
-        <ScheduleCard events={todayEvents} familyMembers={familyMembers} />
+        <ScheduleCard preview={schedulePreview} familyMembers={familyMembers} />
       </EntryEditingProvider>
       <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
     </>
