@@ -102,7 +102,9 @@ export async function extractItemsFromMessage(
   const roster = familyMembers.map((m) => m.name).join(", ");
 
   const response = await client.messages.parse({
-    model: "claude-opus-5",
+    // Sonnet, not Opus — one call per scanned email, every 2h on the cron;
+    // structured extraction against a tight zod schema doesn't need Opus.
+    model: "claude-sonnet-5",
     max_tokens: 4096,
     system: `You extract structured entries from a family's email (body text and any attachments). Family members: ${roster}.
 

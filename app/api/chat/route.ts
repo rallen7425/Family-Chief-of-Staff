@@ -34,7 +34,9 @@ export async function POST(request: Request) {
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await client.messages.create({
-      model: "claude-opus-5",
+      // Sonnet, not Opus — household Q&A + tool routing doesn't need Opus,
+      // and this runs up to MAX_ITERATIONS times per chat turn.
+      model: "claude-sonnet-5",
       max_tokens: 1024,
       system,
       tools: CHAT_TOOLS,
