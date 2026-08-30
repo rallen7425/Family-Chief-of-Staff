@@ -38,7 +38,8 @@ const ExtractedItemSchema = z.object({
   is_critical: z
     .boolean()
     .describe(
-      "true ONLY for school/office closures, event cancellations, safety alerts, weather emergencies, or a hard deadline that falls on the same day. false for every routine event, practice, game, appointment, reminder, or ordinary deadline. When unsure, false."
+      "true ONLY when missing this would derail the whole family's day or a whole-school / whole-household plan: a full school or office CLOSURE, a campus-wide EARLY DISMISSAL, a weather or safety EMERGENCY affecting everyone, the cancellation of a MAJOR event the whole family was planning around, or a hard deadline that is genuinely DUE TODAY with real consequences. " +
+        "false for everything else. Specifically NOT critical: one child's or one team's practice/game being cancelled, moved, or rescheduled; a detail or sub-line of another item (report/arrival/pickup times, what to wear, where to park); a general health or informational notice (\"a case of X was reported\", \"monitor your child\", \"please be aware\"); any reminder; any ordinary future deadline. When unsure, false."
     ),
   notes: z.string().nullable().describe("Anything relevant that doesn't fit a structured field above."),
   source_excerpt: z.string().describe("The exact quoted snippet that justifies this item"),
