@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
+import { getMemberDetails } from "@/lib/data/memberDetails";
+import type { MemberDetail } from "@/lib/types";
 
 function revalidate() {
   revalidatePath("/family");
   revalidatePath("/profile");
+}
+
+/** Client-callable read (the details dialog opens on demand). */
+export async function listMemberDetails(memberId: string): Promise<MemberDetail[]> {
+  return getMemberDetails(memberId);
 }
 
 export async function addDetail(input: {
