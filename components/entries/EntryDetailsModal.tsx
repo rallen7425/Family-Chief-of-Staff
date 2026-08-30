@@ -8,7 +8,7 @@ import { Modal } from "@/components/shared/Modal";
 import { EntryForm, type EntryFormInitialValues, type LinkableEntry } from "@/components/entries/EntryForm";
 import { updateEntry, deleteEntry } from "@/lib/actions/entries";
 import { describeVisibility } from "@/lib/visibility";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 import { ASSISTANT_NAME } from "@/lib/config";
 import type { ArrivalBufferRule } from "@/lib/arrival";
 import type { CalendarEvent, FamilyMember, SourceType } from "@/lib/types";
@@ -204,7 +204,8 @@ export function EntryDetailsModal({
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`w-2.5 h-2.5 rounded-full shrink-0 ${member ? ACCENT_BG[member.accentColor] : "bg-border"}`}
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${member ? "" : "bg-border"}`}
+            style={member ? { background: ACCENT_HEX[member.accentColor] } : undefined}
           />
           <span className="text-[14px] text-muted-text">
             {isAdvisory ? "Household advisory" : member ? member.name : "Whole family"}

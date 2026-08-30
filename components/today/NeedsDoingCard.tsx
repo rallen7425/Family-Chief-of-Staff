@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import type { Todo, FamilyMember } from "@/lib/types";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 
 interface NeedsDoingCardProps {
   todos: Todo[];
@@ -37,7 +37,10 @@ export function NeedsDoingCard({ todos, familyMembers }: NeedsDoingCardProps) {
                 {todo.title}
               </span>
               {member && !todo.completed && (
-                <div className={`w-2 h-2 rounded-full shrink-0 ${ACCENT_BG[member.accentColor]}`} />
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: ACCENT_HEX[member.accentColor] }}
+                />
               )}
             </div>
           );

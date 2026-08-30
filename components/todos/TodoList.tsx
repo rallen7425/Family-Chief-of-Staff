@@ -1,5 +1,5 @@
 import type { FamilyMember, Todo } from "@/lib/types";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 import { TodoCheckbox } from "@/components/todos/TodoCheckbox";
 
 interface TodoListProps {
@@ -41,7 +41,10 @@ export function TodoList({ todos, familyMembers }: TodoListProps) {
                 )}
               </div>
               {member && !todo.completed && (
-                <div className={`w-2 h-2 rounded-full shrink-0 ${ACCENT_BG[member.accentColor]}`} />
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: ACCENT_HEX[member.accentColor] }}
+                />
               )}
             </div>
           );

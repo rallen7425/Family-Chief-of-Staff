@@ -10,7 +10,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
-import { ACCENT_BG, ACCENT_BORDER } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -71,16 +71,16 @@ export function MonthView({ month, events, familyMembers, buildDayHref }: MonthV
                       <span
                         key={event.id}
                         aria-label="Unconfirmed"
-                        className={`w-1.5 h-1.5 rounded-full border ${
-                          member ? ACCENT_BORDER[member.accentColor] : "border-muted-label"
-                        }`}
+                        className={`w-1.5 h-1.5 rounded-full border ${member ? "" : "border-muted-label"}`}
+                        style={member ? { borderColor: ACCENT_HEX[member.accentColor] } : undefined}
                       />
                     );
                   }
                   return (
                     <span
                       key={event.id}
-                      className={`w-1.5 h-1.5 rounded-full ${member ? ACCENT_BG[member.accentColor] : "bg-border"}`}
+                      className={`w-1.5 h-1.5 rounded-full ${member ? "" : "bg-border"}`}
+                      style={member ? { background: ACCENT_HEX[member.accentColor] } : undefined}
                     />
                   );
                 })}

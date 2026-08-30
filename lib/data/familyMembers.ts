@@ -4,7 +4,19 @@ import type { FamilyMember } from "@/lib/types";
 import type { FamilyMemberRow } from "@/lib/data/dbTypes";
 
 function mapFamilyMember(row: FamilyMemberRow): FamilyMember {
-  return { id: row.id, name: row.name, accentColor: row.accent_color, isAdult: row.is_adult };
+  return {
+    id: row.id,
+    name: row.name,
+    accentColor: row.accent_color,
+    isAdult: row.is_adult,
+    relationship: row.relationship ?? undefined,
+    isHeadOfHousehold: row.is_head_of_household ?? false,
+    birthday: row.birthday ?? undefined,
+    email: row.email ?? undefined,
+    phone: row.phone ?? undefined,
+    school: row.school ?? undefined,
+    grade: row.grade ?? undefined,
+  };
 }
 
 /** Wrapped in React's cache() since both the root layout (for the chat

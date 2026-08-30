@@ -10,6 +10,25 @@ export interface FamilyMemberRow {
   avatar_url: string | null;
   sort_order: number;
   is_adult: boolean;
+  relationship: string | null;
+  is_head_of_household: boolean;
+  birthday: string | null; // YYYY-MM-DD
+  email: string | null;
+  phone: string | null;
+  school: string | null;
+  grade: string | null;
+}
+
+export interface MemberDetailRow {
+  id: string;
+  family_member_id: string;
+  label: string;
+  value: string;
+  fields: { label: string; value: string }[];
+  ignored: boolean;
+  source: "manual" | "detected" | "voice";
+  created_at: string;
+  updated_at: string;
 }
 
 /** Row shape of `family_chief_of_staff.entries` — the unified table that

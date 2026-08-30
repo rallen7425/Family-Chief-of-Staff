@@ -1,4 +1,26 @@
-export type AccentColor = "coral" | "teal" | "gold" | "berry";
+/** Person colour. The first four are the original brand accents (existing
+ * members use them); the rest were added with Profile & Family Management.
+ * Hex + display names live in `lib/colors.ts` (`ACCENT_HEX` / `ACCENT_NAME`)
+ * — rendered inline, not as Tailwind classes. */
+export type AccentColor =
+  | "coral"
+  | "teal"
+  | "gold"
+  | "berry"
+  | "blue"
+  | "navyBlue"
+  | "lightBlue"
+  | "green"
+  | "lightGreen"
+  | "yellow"
+  | "purple"
+  | "pink"
+  | "fuchsia"
+  | "maroon"
+  | "brown"
+  | "grey"
+  | "black"
+  | "red";
 export type SourceType = "manual" | "chat" | "email_scan" | "system";
 export type ItemStatus = "pending_review" | "confirmed" | "dismissed";
 
@@ -14,8 +36,32 @@ export interface FamilyMember {
   name: string;
   accentColor: AccentColor;
   /** Drives computed event visibility (see lib/visibility.ts) — adults'
-   * assigned events default to private-to-them, kids' don't. */
+   * assigned events default to private-to-them, kids' don't. Recomputed
+   * from `birthday` on every write (see lib/family.ts `computeIsAdult`). */
   isAdult: boolean;
+  /** Free text, e.g. "Dad", "Step-Mom", "Guardian". */
+  relationship?: string;
+  isHeadOfHousehold: boolean;
+  /** YYYY-MM-DD. */
+  birthday?: string;
+  email?: string;
+  phone?: string;
+  /** Shown on Edit Member for computed children only. */
+  school?: string;
+  grade?: string;
+}
+
+/** A structured secondary-profile item (activity / team / coach). */
+export interface MemberDetail {
+  id: string;
+  familyMemberId: string;
+  label: string;
+  value: string;
+  /** Expandable sub-rows: coach contact, location, schedule, etc. */
+  fields: { label: string; value: string }[];
+  /** Soft-hidden from downstream logic, still shown (struck through). */
+  ignored: boolean;
+  source: "manual" | "detected" | "voice";
 }
 
 export interface SourceDetail {

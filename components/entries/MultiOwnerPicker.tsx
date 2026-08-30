@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 import type { FamilyMember } from "@/lib/types";
 
 interface MultiOwnerPickerProps {
@@ -79,7 +79,10 @@ export function MultiOwnerPicker({ familyMembers, selectedIds, onChange, disable
                 >
                   {checked && <Check size={11} className="text-white" strokeWidth={3} />}
                 </span>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${ACCENT_BG[member.accentColor]}`} />
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: ACCENT_HEX[member.accentColor] }}
+                />
                 {member.name}
               </button>
             );

@@ -3,7 +3,7 @@ import { Filter, Info } from "lucide-react";
 import { format } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import type { SchedulePreview } from "@/lib/schedulePreview";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
 import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 
@@ -34,9 +34,8 @@ function ScheduleEventRow({
           </div>
         </div>
         <div
-          className={`w-[3px] self-stretch rounded-full mt-1 ${
-            isAdvisory ? "bg-border" : member ? ACCENT_BG[member.accentColor] : "bg-border"
-          }`}
+          className={`w-[3px] self-stretch rounded-full mt-1 ${isAdvisory || !member ? "bg-border" : ""}`}
+          style={!isAdvisory && member ? { background: ACCENT_HEX[member.accentColor] } : undefined}
         />
         <div className="flex-1 pb-2">
           {isAdvisory ? (

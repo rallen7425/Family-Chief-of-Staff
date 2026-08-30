@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { FamilyMember } from "@/lib/types";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 
 interface PersonFilterProps {
   familyMembers: FamilyMember[];
@@ -20,7 +20,10 @@ export function PersonFilter({ familyMembers, selectedPersonId, buildHref }: Per
           href={buildHref(member.id)}
           className={`${pillClass(selectedPersonId === member.id)} inline-flex items-center gap-2`}
         >
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${ACCENT_BG[member.accentColor]}`} />
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ background: ACCENT_HEX[member.accentColor] }}
+          />
           {member.name}
         </Link>
       ))}

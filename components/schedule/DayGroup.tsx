@@ -1,7 +1,7 @@
 import { format, isSameDay } from "date-fns";
 import { Bell } from "lucide-react";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
-import { ACCENT_BG } from "@/lib/colors";
+import { ACCENT_HEX } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
 import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 import { AdvisorySummary } from "@/components/schedule/AdvisorySummary";
@@ -72,8 +72,13 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
                   </div>
                   <div
                     className={`w-[3px] self-stretch rounded-full mt-0.5 ${
-                      isStandaloneReminder ? "bg-border" : member ? ACCENT_BG[member.accentColor] : "bg-border"
+                      isStandaloneReminder || !member ? "bg-border" : ""
                     }`}
+                    style={
+                      !isStandaloneReminder && member
+                        ? { background: ACCENT_HEX[member.accentColor] }
+                        : undefined
+                    }
                   />
                   <div className="flex-1">
                     {isStandaloneReminder ? (
