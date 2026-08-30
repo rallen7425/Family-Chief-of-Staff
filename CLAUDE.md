@@ -97,6 +97,25 @@ populates `keep_in_mind_items`. Also worth a look: `getUrgentTodos` ignores revi
 design, so an overdue-but-unreviewed task shows in both the review count and as a deadline
 notification (accepted overlap).
 
+### 2026-08-30 addendum — model + cost + pipeline
+
+- **`13822f3` (deployed):** tightened the `is_critical` extraction criteria — whole-day /
+  whole-household disruption or a genuinely same-day hard deadline only; explicit exclusions
+  for single-team schedule changes, sub-detail lines, and informational health notices. First
+  pass over-flagged all three.
+- **`4bff342` (deployed):** chat (`app/api/chat/route.ts`) **and** email extraction
+  (`extractEvents.ts`) moved from `claude-opus-5` → **`claude-sonnet-5`** — Anthropic org ran
+  out of credits (opus per-email-scan + up-to-4 opus calls/chat-turn was the cost driver).
+  Calibration probe + a live `/api/chat` schedule query confirmed Sonnet holds up.
+- **API credits** restored by the user. **Gmail OAuth re-auth'd** 2026-08-30 (ran
+  `scripts/gmail/get-refresh-token.ts`) — the token had hit Google's 7-day "Testing"-status
+  expiry. Backlog of ~week's mail drained via repeated manual `/api/pipeline/gmail-scan` POSTs
+  (0 errors); the 2h cron is healthy again. New scanned entries all correctly `is_critical:false`.
+- **Still open:** move the GCP OAuth consent screen from "Testing" → "In production" so the
+  refresh token stops expiring every 7 days (console.cloud.google.com → Family Chief of Staff
+  → APIs & Services → OAuth consent screen → Publish app). **Deferred by the user.** If the
+  scan goes quiet ~2026-09-06, that's why — re-run the get-refresh-token script.
+
 ### Local dev reminder
 
 Global `node` is v20; the repo needs ≥22. Use `/opt/homebrew/bin/node` (v26):
