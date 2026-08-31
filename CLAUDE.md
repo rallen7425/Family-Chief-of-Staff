@@ -15,85 +15,70 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-08-30) — Profile & Family Management (IN PROGRESS — PAUSED)
+## Session status (2026-08-30) — Profile & Family Management (built on a branch, NOT deployed)
 
-Building `profile-family-management-implementation-prompt.md` (+ `profile-family-management-plan.md`
-decision record + 7 new artboards in `design/mockups/event-redesign-prototype.html` row 2).
-Paused mid‑Part‑D waiting on Anthropic usage credits to reset. **Approved plan:
-`~/.claude/plans/quizzical-dreaming-hare.md` — read it first on resume.**
+Built `profile-family-management-implementation-prompt.md` (+ `profile-family-management-plan.md`
+decision record + 7 new artboards). Approved plan: `~/.claude/plans/quizzical-dreaming-hare.md`.
+**All parts (A–E) complete on the branch. Not merged, not pushed, not deployed** — `main` and prod
+are untouched (still the notifications build).
 
-### Branch / deploy state — READ THIS FIRST
+### Branch state
 
 | | |
 |---|---|
-| **Feature branch** | `profile-family-management` in **both** repos. `family-chief-of-staff` @ `c69331e` (Parts B, C, D‑WIP). `rocky-coast-labs` @ `c614700` (migration only). Neither pushed. `main` untouched. |
-| **Migration** | `rocky-coast-labs/supabase/migrations/20260830000001_family_chief_of_staff_profile.sql` — **APPLIED to the shared DB** (`supabase db push` ran; the user added a Bash permission rule so I can push migrations myself now). `family_members` gained `relationship / is_head_of_household / birthday / email / phone / school / grade`; new `member_details` table. All new columns null/default in prod (no data yet). |
-| **Production** | Unaffected — still runs the notifications build (`main`). The feature branch is not deployed. |
-| **Checks** | `tsc` / `eslint` / `npm test` (119) / `next build` all green on the branch at the pause point. |
-| **Rollout** | Single push + `vercel --prod` at the very end (user's call), not per‑phase. |
+| **Feature branch** | `profile-family-management` in **both** repos — `family-chief-of-staff` @ `fd794d4` (Parts A–E + CLAUDE.md), `rocky-coast-labs` @ `c614700` (migration). |
+| **Migration** | `20260830000001_family_chief_of_staff_profile.sql` — **APPLIED to the shared DB** (`supabase db push` — the user added a Bash permission rule; I run migrations myself now). `family_members` +`relationship/is_head_of_household/birthday/email/phone/school/grade`; new `member_details`. All null/default in prod. |
+| **Checks** | `tsc` / `eslint` / `npm test` (121) / `next build` — green on the branch. |
+| **Next step** | Merge `profile-family-management` → `main` in both repos, then `git push` + `vercel --prod` (single deploy; user's go). |
 
-### Done (Parts B, C, D‑partial)
+### What it adds
 
-- **B — lib foundation** (`37e6f89`): `AccentColor` → 18 values; `lib/colors.ts` replaced the 4
-  Tailwind class maps with `ACCENT_HEX` / `ACCENT_NAME` / `ACCENT_COLORS` (the ~8 person‑colour
-  call sites now use inline `style`); `FamilyMember` + `MemberDetail` types + row types + mapper;
-  `lib/family.ts` (`computeIsAdult` real date math / `ageInYears` / `initialsOf` /
-  `colorInUseByOthers`, 8 tests); `lib/activeMember.ts` (`fcos_active_member` cookie, HoH→adult→first
-  fallback); `lib/data/{memberDetails,locations}.ts`; `lib/actions/{familyMembers,memberDetails,
-  locations}.ts` (`saveFamilyMember`, `updateProfileFields`, `removeFamilyMember`,
-  `setHeadOfHousehold` [adult‑guarded], `forgetMemberInfo`/`forgetEverything`, `setActiveMember`;
-  detail CRUD + `listMemberDetails`; `updateHomeAddress`).
-- **C — Settings Hub + My Profile + header** (`7ccf006`): `/settings` is now the 4‑row hub
-  (Connected Accounts row HoH‑gated); arrival editor moved to `/settings/arrival` (reused verbatim);
-  `/profile` = My Profile (avatar, read‑only HoH badge, inline‑edit Name/Relationship/Email/Phone/
-  Colour, Manage‑Family shortcut, Forget‑my‑info, Switch‑profile pills); header avatar is a real
-  `<Link href="/profile">` with the active member's initials/colour. New client components:
-  `InlineEditField`, `ColorSwatchField`, `MyProfileClient`, `ForgetDialog` (3‑step), `SettingsRow`,
-  `PrivacyRow`. **Verified live**: hub renders, `/profile` inline edit round‑trips to the DB.
-- **D — partial** (`c69331e`): `components/family/ColorGrid.tsx` (controlled 18‑swatch form
-  picker) and `components/family/EditMemberDialog.tsx` (create/edit Modal — all fields, adult/child
-  gating, colour conflict, danger zone). **Not wired to any page yet.** `listMemberDetails` added.
+- **`AccentColor` → 18 values**; `lib/colors.ts` dropped the 4 Tailwind class maps for
+  `ACCENT_HEX`/`ACCENT_NAME`/`ACCENT_COLORS` — the ~8 person‑colour sites now render inline
+  `style={{ background: ACCENT_HEX[c] }}` (semantic `bg-accent-berry` etc. untouched).
+- **`lib/family.ts`**: `computeIsAdult` (real month/day math), `ageInYears`, `effectiveIsAdult`
+  (birthday if present, else stored `is_adult` — so existing kids with no birthday don't read as
+  adults), `initialsOf`, `colorInUseByOthers`. Used by the dialogs' field gating, HoH eligibility,
+  and the `setHeadOfHousehold` guard. `saveFamilyMember` recomputes `is_adult` only when a
+  birthday is present.
+- **`lib/activeMember.ts`**: `fcos_active_member` cookie = "whose app this is" (device
+  convenience, no auth), HoH→adult→first fallback. Read server‑side in `app/layout.tsx`.
+- **Server actions**: `lib/actions/familyMembers.ts` (`saveFamilyMember`, `updateProfileFields`,
+  `removeFamilyMember` [deletes the row], `setHeadOfHousehold` [effective‑adult guarded],
+  `forgetMemberInfo` [clears 5 fields + that member's `member_details`, never touches `entries`],
+  `forgetEverything`, `setActiveMember`), `memberDetails.ts` (CRUD + `listMemberDetails`),
+  `locations.ts` (`updateHomeAddress` on the `member_locations` Home row).
+- **Routes**: `/settings` = 4‑row hub (Connected Accounts row HoH‑gated); `/settings/arrival` (the
+  old settings body, `ArrivalRulesEditor` reused verbatim); `/profile` = My Profile (inline‑edit
+  Name/Relationship/Email/Phone/Colour, read‑only HoH badge, Switch‑profile pills, Forget‑my‑info);
+  `/family` = Manage Family (Home card, HoH card + dialog, member list → Edit Member sheet, Add
+  member, arrival‑rules row); `/settings/accounts` = Manage Connected Accounts (HoH‑gated redirect;
+  the one real `gmail_credentials` row attributed to the matching adult, others "Not connected"
+  with a disabled Connect — **no real per‑member OAuth**, that's a separate project).
+- **Components**: `components/profile/*` (`InlineEditField`, `ColorSwatchField`, `MyProfileClient`),
+  `components/family/*` (`ManageFamilyClient`, `EditMemberDialog`, `HeadOfHouseholdDialog`,
+  `HomeLocationCard`, `ColorGrid`, `MemberDetailsDialog` — its chat/voice bar is rendered but
+  inert), `components/settings/*` (`SettingsRow`, `PrivacyRow`, `ForgetDialog` 3‑step). Header
+  avatar is now a real `<Link href="/profile">`.
 
-### Resume here — remaining work
+### Verified
 
-**Part D (finish):**
-1. `app/family/page.tsx` — server page: back arrow + "Manage Family"; `<HomeLocationCard>` (from
-   `getHomeLocation()`); Head‑of‑Household card (chips of `isHeadOfHousehold` members + "Edit" →
-   `HeadOfHouseholdDialog`); Household members list (row → `EditMemberDialog` edit mode); "Add
-   family member" → `EditMemberDialog` create mode; Arrival‑buffer‑rules row → `/settings/arrival`.
-   The interactive list + dialogs need a client wrapper (`ManageFamilyClient`) since the page is a
-   Server Component.
-2. `components/family/HomeLocationCard.tsx` (client) — inline edit → `updateHomeAddress`.
-3. `components/family/HeadOfHouseholdDialog.tsx` (client Modal) — every member; toggle for
-   `computeIsAdult(birthday)` members → `setHeadOfHousehold`; "Under 18" label otherwise.
-   (`HeadOfHouseholdCard` client wrapper to host it, or fold into `ManageFamilyClient`.)
-4. Re‑enable the "Activities, teams & details" row in `EditMemberDialog` once Part E's
-   `MemberDetailsDialog` exists (currently a disabled placeholder with a `TODO(Part E)` comment).
+`tsc`/`eslint`/121 tests/`next build`; all 7 routes SSR 200; `/settings` hub layout + the
+non‑HoH Connected‑Accounts gate (`/settings/accounts` redirects); `/profile` inline‑edit
+round‑trips to the DB (tested + reverted); setting a child birthday on Ben flips the `/family`
+list label to "Child" and carries `birthday`/`school`/`grade`/`isAdult:false` into the Edit
+dialog payload; `computeIsAdult`/`effectiveIsAdult`/`colorInUseByOthers` unit‑covered.
+**Not click‑through‑verified** (the in‑app browser pane hung most of the session): opening the
+Edit Member / HoH / Member Details / Forget modals and clicking through — they use the identical
+`Modal` + `useState` + server‑action + `router.refresh()` pattern as the verified Part‑C
+`ForgetDialog`/`InlineEditField`. Worth a manual pass after deploy. DB restored to baseline
+(all new columns null/default, `member_details` empty).
 
-**Part E:**
-5. `components/family/MemberDetailsDialog.tsx` (client Modal) — opens on demand, loads via
-   `listMemberDetails(memberId)`; row list with expand (`fields`), Edit (inline) / Ignore
-   (`toggleDetailIgnored`, struck‑through) / Remove; "+ Add detail" (`addDetail`); chat/voice bar
-   **rendered but inert**. Then wire it back into `EditMemberDialog`.
-6. `app/settings/accounts/page.tsx` — Manage Connected Accounts, HoH‑gated (redirect to
-   `/settings` if the active member isn't HoH). One card per **adult** member: Gmail row +
-   "Coming soon" Calendar row. Show the real `gmail_credentials` row for whichever adult's `email`
-   matches `google_account_email` (fallback: first HoH adult); every other adult "Not connected"
-   with a disabled Connect + tooltip. Footer note from `ManageConnectedAccounts.dc.html`. **No real
-   OAuth.**
+### Out of scope (per prompt §4)
 
-**Then:** `tsc`/`eslint`/`npm test`/`next build`; dev‑server + browser run through the whole flow
-(see the plan's Verification section — add a child birthday → HoH toggle hidden + school/grade
-shown + email/phone absent; colour conflict; Forget vs Remove are different code paths; switch
-active member persists across refresh; 18‑colour regression on Today + `/schedule`); merge
-`profile-family-management` → `main` in both repos; single push + `vercel --prod`.
-
-### Mockup artboards (extracted, for reference)
-
-`/private/tmp/.../scratchpad/mock/*.dc.html` may be gone after the pause — re‑extract from
-`design/mockups/event-redesign-prototype.html` (it's the embedded `<script>` JSON with
-`content.files`, title "Family COS Mockups"): `SettingsHub`, `MyProfile`, `Family`, `EditMember`,
-`MemberDetails`, `Forget`, `ManageConnectedAccounts`.
+Real auth/login; real per‑member Gmail OAuth + calendar integration; Member Details Phase 2
+(detected entries) / Phase 3 (freeform + voice) — chat bar ships inert; HoH / accounts visibility
+as a security boundary.
 
 ---
 
