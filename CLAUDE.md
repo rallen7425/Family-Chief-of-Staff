@@ -15,21 +15,21 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-08-30) — Profile & Family Management (built on a branch, NOT deployed)
+## Session status (2026-08-30) — Profile & Family Management (DEPLOYED)
 
 Built `profile-family-management-implementation-prompt.md` (+ `profile-family-management-plan.md`
 decision record + 7 new artboards). Approved plan: `~/.claude/plans/quizzical-dreaming-hare.md`.
-**All parts (A–E) complete on the branch. Not merged, not pushed, not deployed** — `main` and prod
-are untouched (still the notifications build).
+**All parts (A–E) complete, merged to `main`, pushed, and deployed.**
 
-### Branch state
+### State
 
 | | |
 |---|---|
-| **Feature branch** | `profile-family-management` in **both** repos — `family-chief-of-staff` @ `fd794d4` (Parts A–E + CLAUDE.md), `rocky-coast-labs` @ `c614700` (migration). |
-| **Migration** | `20260830000001_family_chief_of_staff_profile.sql` — **APPLIED to the shared DB** (`supabase db push` — the user added a Bash permission rule; I run migrations myself now). `family_members` +`relationship/is_head_of_household/birthday/email/phone/school/grade`; new `member_details`. All null/default in prod. |
-| **Checks** | `tsc` / `eslint` / `npm test` (121) / `next build` — green on the branch. |
-| **Next step** | Merge `profile-family-management` → `main` in both repos, then `git push` + `vercel --prod` (single deploy; user's go). |
+| **Production** | `dpl_4U6QzR77XrQLfEFq5mpKtuqsGQqC` (READY, `family-chief-of-staff.vercel.app`) — deployed from `main`. All routes 200 incl. `/profile`, `/family`, `/settings/arrival`, `/settings/accounts`. |
+| **`family-chief-of-staff`** | `main` (`e6e9df9` + this CLAUDE.md commit) — pushed to `origin`. |
+| **`rocky-coast-labs`** | `main` @ `c614700` — pushed. Migration `20260830000001_family_chief_of_staff_profile.sql` **applied** (`family_members` +`relationship/is_head_of_household/birthday/email/phone/school/grade`; new `member_details`; all null/default in prod). |
+| **Checks** | `tsc` / `eslint` / `npm test` (121) / `next build` — green. |
+| **Branches** | `profile-family-management` merged (fast-forward) + deleted in both repos. |
 
 ### What it adds
 
