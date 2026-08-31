@@ -8,7 +8,7 @@ import { ColorGrid } from "@/components/family/ColorGrid";
 import { ForgetDialog } from "@/components/settings/ForgetDialog";
 import { MemberDetailsDialog } from "@/components/family/MemberDetailsDialog";
 import { saveFamilyMember, removeFamilyMember, type FamilyMemberInput } from "@/lib/actions/familyMembers";
-import { ageInYears, computeIsAdult, colorInUseByOthers, initialsOf } from "@/lib/family";
+import { ageInYears, computeIsAdult, colorInUseByOthers, effectiveIsAdult, initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
 import type { AccentColor, FamilyMember, MemberDetail } from "@/lib/types";
 
@@ -51,7 +51,13 @@ export function EditMemberDialog({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isPending, start] = useTransition();
 
-  const isAdult = computeIsAdult(birthday || null);
+  // A birthday is authoritative; without one, keep the member's stored age
+  // class (new members default to adult).
+  const isAdult = birthday
+    ? computeIsAdult(birthday)
+    : member
+      ? effectiveIsAdult(member)
+      : true;
   const age = ageInYears(birthday || null);
 
   function save() {

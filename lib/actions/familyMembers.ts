@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getSupabaseClient } from "@/lib/supabase";
-import { computeIsAdult } from "@/lib/family";
+import { computeIsAdult, effectiveIsAdult } from "@/lib/family";
 import { ACTIVE_MEMBER_COOKIE } from "@/lib/activeMember";
 import type { AccentColor } from "@/lib/types";
 
@@ -40,9 +40,10 @@ function validate(input: FamilyMemberInput): string | null {
 }
 
 /** Age class decides which optional fields are kept — a child carries no
- * email/phone, an adult carries no school/grade (absent, not blank). */
-function toRow(input: FamilyMemberInput) {
-  const isAdult = computeIsAdult(input.birthday);
+ * email/phone, an adult carries no school/grade (absent, not blank).
+ * `isAdult` is authoritative here: from the birthday when there is one,
+ * otherwise preserved (edit) or the DB default `false` (create). */
+function toRow(input: FamilyMemberInput, isAdult: boolean) {
   return {
     name: input.name.trim(),
     accent_color: input.accentColor,
@@ -64,8 +65,20 @@ export async function saveFamilyMember(
   if (err) return { error: err };
   const supabase = getSupabaseClient();
 
+  // Only a birthday recomputes is_adult. Editing a member without touching
+  // their (empty) birthday must NOT silently flip an existing kid to adult.
+  let isAdult: boolean;
+  if (input.birthday) {
+    isAdult = computeIsAdult(input.birthday);
+  } else if (id) {
+    const { data } = await supabase.from("family_members").select("is_adult").eq("id", id).single();
+    isAdult = data?.is_adult ?? true;
+  } else {
+    isAdult = false;
+  }
+
   if (id) {
-    const { error } = await supabase.from("family_members").update(toRow(input)).eq("id", id);
+    const { error } = await supabase.from("family_members").update(toRow(input, isAdult)).eq("id", id);
     if (error) return { error: error.message };
   } else {
     const { data: last } = await supabase
@@ -77,7 +90,7 @@ export async function saveFamilyMember(
     const nextOrder = (last?.sort_order ?? -1) + 1;
     const { error } = await supabase
       .from("family_members")
-      .insert({ ...toRow(input), sort_order: nextOrder });
+      .insert({ ...toRow(input, isAdult), sort_order: nextOrder });
     if (error) return { error: error.message };
   }
   revalidateProfileViews();
@@ -145,11 +158,11 @@ export async function setHeadOfHousehold(id: string, on: boolean): Promise<{ err
   if (on) {
     const { data, error: readErr } = await supabase
       .from("family_members")
-      .select("birthday")
+      .select("birthday, is_adult")
       .eq("id", id)
       .single();
     if (readErr) return { error: readErr.message };
-    if (!computeIsAdult(data?.birthday ?? null)) {
+    if (!effectiveIsAdult({ birthday: data?.birthday ?? null, isAdult: data?.is_adult ?? false })) {
       return { error: "Only adults can be head of household." };
     }
   }

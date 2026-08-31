@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ageInYears, computeIsAdult, colorInUseByOthers, initialsOf } from "@/lib/family";
+import {
+  ageInYears,
+  computeIsAdult,
+  colorInUseByOthers,
+  effectiveIsAdult,
+  initialsOf,
+} from "@/lib/family";
 import type { FamilyMember } from "@/lib/types";
 
 const NOW = new Date("2026-08-30T12:00:00.000Z");
@@ -28,6 +34,17 @@ describe("computeIsAdult", () => {
     expect(computeIsAdult("2013-05-14", NOW)).toBe(false);
     expect(computeIsAdult("2008-08-30", NOW)).toBe(true); // turns 18 today
     expect(computeIsAdult("2008-08-31", NOW)).toBe(false); // turns 18 tomorrow
+  });
+});
+
+describe("effectiveIsAdult", () => {
+  it("uses the birthday when there is one", () => {
+    expect(effectiveIsAdult({ birthday: "2013-05-14", isAdult: true }, NOW)).toBe(false);
+    expect(effectiveIsAdult({ birthday: "1990-01-01", isAdult: false }, NOW)).toBe(true);
+  });
+  it("falls back to the stored flag with no birthday", () => {
+    expect(effectiveIsAdult({ birthday: null, isAdult: false }, NOW)).toBe(false);
+    expect(effectiveIsAdult({ isAdult: true }, NOW)).toBe(true);
   });
 });
 

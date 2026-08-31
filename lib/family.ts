@@ -26,6 +26,16 @@ export function computeIsAdult(birthday: string | null | undefined, now: Date = 
   return age === null ? true : age >= 18;
 }
 
+/** The age class the UI and the HoH guard actually use: a birthday is
+ * authoritative; without one, fall back to the stored `isAdult` flag
+ * (so existing kids without a birthday on file don't read as adults). */
+export function effectiveIsAdult(
+  member: { birthday?: string | null; isAdult: boolean },
+  now: Date = new Date()
+): boolean {
+  return member.birthday ? computeIsAdult(member.birthday, now) : member.isAdult;
+}
+
 /** "Rick Allen" -> "RA", "Ben" -> "B". Up to two letters. */
 export function initialsOf(name: string): string {
   return name

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/shared/Modal";
 import { setHeadOfHousehold } from "@/lib/actions/familyMembers";
-import { computeIsAdult, initialsOf } from "@/lib/family";
+import { effectiveIsAdult, initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
 import type { FamilyMember } from "@/lib/types";
 
@@ -43,7 +43,7 @@ export function HeadOfHouseholdDialog({
         {error && <p className="text-[13px] text-accent-berry font-medium">{error}</p>}
         <div className="flex flex-col">
           {members.map((m) => {
-            const eligible = computeIsAdult(m.birthday ?? null);
+            const eligible = effectiveIsAdult(m);
             const on = m.isHeadOfHousehold;
             return (
               <div
