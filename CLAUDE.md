@@ -27,7 +27,7 @@ decision record + 7 new artboards). Approved plan: `~/.claude/plans/quizzical-dr
 |---|---|
 | **Production** | `dpl_4U6QzR77XrQLfEFq5mpKtuqsGQqC` (READY, `family-chief-of-staff.vercel.app`) — deployed from `main`. All routes 200 incl. `/profile`, `/family`, `/settings/arrival`, `/settings/accounts`. |
 | **`family-chief-of-staff`** | `main` (`e6e9df9` + this CLAUDE.md commit) — pushed to `origin`. |
-| **`rocky-coast-labs`** | `main` @ `c614700` — pushed. Migration `20260830000001_family_chief_of_staff_profile.sql` **applied** (`family_members` +`relationship/is_head_of_household/birthday/email/phone/school/grade`; new `member_details`; all null/default in prod). |
+| **`rocky-coast-labs`** | `main` @ `ea3f4d0` — pushed. Migrations **applied**: `20260830000001` (`family_members` +`relationship/is_head_of_household/birthday/email/phone/school/grade`; new `member_details`) and `20260830000002` (dropped `family_members_accent_color_check` — the old 4-value CHECK was rejecting the new palette on profile save; accent_color is now app-validated). |
 | **Checks** | `tsc` / `eslint` / `npm test` (121) / `next build` — green. |
 | **Branches** | `profile-family-management` merged (fast-forward) + deleted in both repos. |
 
