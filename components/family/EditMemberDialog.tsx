@@ -6,10 +6,11 @@ import { Trash2, ChevronRight } from "lucide-react";
 import { Modal } from "@/components/shared/Modal";
 import { ColorGrid } from "@/components/family/ColorGrid";
 import { ForgetDialog } from "@/components/settings/ForgetDialog";
+import { MemberDetailsDialog } from "@/components/family/MemberDetailsDialog";
 import { saveFamilyMember, removeFamilyMember, type FamilyMemberInput } from "@/lib/actions/familyMembers";
 import { ageInYears, computeIsAdult, colorInUseByOthers, initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
-import type { AccentColor, FamilyMember } from "@/lib/types";
+import type { AccentColor, FamilyMember, MemberDetail } from "@/lib/types";
 
 const LABEL = "text-[12px] font-semibold text-muted-text uppercase tracking-[0.03em] mb-1.5 block";
 const INPUT =
@@ -24,12 +25,14 @@ export function EditMemberDialog({
   onClose,
   member,
   allMembers,
+  details = [],
 }: {
   open: boolean;
   onClose: () => void;
   /** undefined = create mode. */
   member?: FamilyMember;
   allMembers: FamilyMember[];
+  details?: MemberDetail[];
 }) {
   const router = useRouter();
   const isCreate = !member;
@@ -45,6 +48,7 @@ export function EditMemberDialog({
   const [error, setError] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [forgetOpen, setForgetOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [isPending, start] = useTransition();
 
   const isAdult = computeIsAdult(birthday || null);
@@ -170,14 +174,17 @@ export function EditMemberDialog({
           conflictWith={(c) => colorInUseByOthers(allMembers, c, member?.id ?? null)}
         />
 
-        {/* TODO(Part E): wire to MemberDetailsDialog */}
         {!isCreate && (
-          <div className="w-full flex items-center justify-between bg-mist border border-border rounded-input px-3.5 py-3 opacity-50">
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="w-full flex items-center justify-between bg-mist border border-border rounded-input px-3.5 py-3 text-left"
+          >
             <span className="block text-[14px] font-semibold text-ink">
               Activities, teams, &amp; additional details
             </span>
             <ChevronRight size={17} className="text-muted-label" />
-          </div>
+          </button>
         )}
 
         {error && <p className="text-[13px] text-accent-berry font-medium">{error}</p>}
@@ -250,12 +257,20 @@ export function EditMemberDialog({
       </div>
 
       {!isCreate && (
-        <ForgetDialog
-          open={forgetOpen}
-          onClose={() => setForgetOpen(false)}
-          members={allMembers}
-          preselectedMemberId={member!.id}
-        />
+        <>
+          <ForgetDialog
+            open={forgetOpen}
+            onClose={() => setForgetOpen(false)}
+            members={allMembers}
+            preselectedMemberId={member!.id}
+          />
+          <MemberDetailsDialog
+            open={detailsOpen}
+            onClose={() => setDetailsOpen(false)}
+            member={member!}
+            items={details}
+          />
+        </>
       )}
     </Modal>
   );
