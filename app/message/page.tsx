@@ -1,6 +1,11 @@
 import { MessageCircle } from "lucide-react";
 import { ASSISTANT_NAME } from "@/lib/config";
 
+// The root layout fetches from Supabase on every render, so no route can be
+// prerendered at build time (the build env has no Supabase creds). Every other
+// page sets this; /message was the lone static one and broke the build.
+export const dynamic = "force-dynamic";
+
 export default function MessagePage() {
   return (
     <div>

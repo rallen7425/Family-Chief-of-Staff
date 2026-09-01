@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { User, Users, Mail } from "lucide-react";
+import { User, Users, Mail, Settings } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getActiveMember } from "@/lib/activeMember";
 import { SettingsRowContent, settingsRowClass } from "@/components/settings/SettingsRow";
@@ -48,6 +48,16 @@ export default async function SettingsPage() {
             />
           </Link>
         )}
+
+        <Link href="/settings/app" className={settingsRowClass}>
+          <SettingsRowContent
+            icon={Settings}
+            iconBg="#EEF2FB"
+            iconColor="#3B6FE5"
+            label="Settings"
+            sub="App preferences"
+          />
+        </Link>
 
         <PrivacyRow members={familyMembers} />
       </div>

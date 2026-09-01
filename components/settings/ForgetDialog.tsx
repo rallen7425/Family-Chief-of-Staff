@@ -14,13 +14,24 @@ interface ForgetDialogProps {
   members: FamilyMember[];
   /** When set, skips the member picker and scopes straight to this person. */
   preselectedMemberId?: string;
+  /** Pre-selects a person in the picker but still lets the user change who
+   * (or switch to the whole family). */
+  defaultMemberId?: string;
 }
 
 type Step = "choose" | "warning" | "done";
 
-export function ForgetDialog({ open, onClose, members, preselectedMemberId }: ForgetDialogProps) {
+export function ForgetDialog({
+  open,
+  onClose,
+  members,
+  preselectedMemberId,
+  defaultMemberId,
+}: ForgetDialogProps) {
   const router = useRouter();
-  const [selectedId, setSelectedId] = useState<string | null>(preselectedMemberId ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    preselectedMemberId ?? defaultMemberId ?? null
+  );
   const [scope, setScope] = useState<"person" | "all">("person");
   const [step, setStep] = useState<Step>("choose");
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +43,7 @@ export function ForgetDialog({ open, onClose, members, preselectedMemberId }: Fo
   function reset() {
     setStep("choose");
     setScope("person");
-    setSelectedId(preselectedMemberId ?? null);
+    setSelectedId(preselectedMemberId ?? defaultMemberId ?? null);
     setError(null);
   }
   function close() {

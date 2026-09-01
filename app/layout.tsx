@@ -29,6 +29,12 @@ export const metadata: Metadata = {
   description: "Family Chief of Staff",
 };
 
+// This layout fetches from Supabase on every render, so nothing under it can be
+// prerendered at build time — the build env has no Supabase creds. Setting it
+// here (rather than per-page) also covers Next's own /_not-found route, which
+// still renders this layout.
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const [familyMembers, pendingReviewEvents, pendingReviewTodos, arrivalRules] = await Promise.all([
     getFamilyMembers(),

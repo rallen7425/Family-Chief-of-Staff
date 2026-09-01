@@ -6,6 +6,7 @@ import type { DayBands, SchedulePreview } from "@/lib/schedulePreview";
 import { ACCENT_HEX } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
 import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
+import { PendingRowActions } from "@/components/events/PendingRowActions";
 
 interface ScheduleCardProps {
   preview: SchedulePreview;
@@ -17,18 +18,21 @@ interface ScheduleCardProps {
 function HeadsRow({ event, familyMembers }: { event: CalendarEvent; familyMembers: FamilyMember[] }) {
   const isAdvisory = event.kind === "advisory";
   return (
-    <EventRow event={event} familyMembers={familyMembers}>
-      <div className="flex gap-3 items-start">
-        <div className="w-12 shrink-0 text-right text-[12px] text-muted-label font-medium pt-0.5">
-          {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+    <div>
+      <EventRow event={event} familyMembers={familyMembers}>
+        <div className="flex gap-3 items-start">
+          <div className="w-12 shrink-0 text-right text-[12px] text-muted-label font-medium pt-0.5">
+            {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+          </div>
+          <p className="flex-1 flex items-center gap-1.5 text-[14px] text-muted-text leading-tight">
+            {isAdvisory && <Info size={13} className="shrink-0 text-muted-label" />}
+            {event.title}
+            <UnconfirmedTag status={event.status} />
+          </p>
         </div>
-        <p className="flex-1 flex items-center gap-1.5 text-[14px] text-muted-text leading-tight">
-          {isAdvisory && <Info size={13} className="shrink-0 text-muted-label" />}
-          {event.title}
-          <UnconfirmedTag status={event.status} />
-        </p>
-      </div>
-    </EventRow>
+      </EventRow>
+      <PendingRowActions entryId={event.id} status={event.status} className="mt-2 pl-[60px]" />
+    </div>
   );
 }
 
@@ -45,6 +49,7 @@ function ScheduleEventRow({
   const startDate = new Date(event.startsAt);
 
   return (
+    <div>
     <EventRow event={event} familyMembers={familyMembers}>
       <div className="flex gap-4 items-start relative">
         <div className="w-14 shrink-0 text-right leading-tight pt-1">
@@ -65,6 +70,8 @@ function ScheduleEventRow({
         </div>
       </div>
     </EventRow>
+      <PendingRowActions entryId={event.id} status={event.status} className="mt-2 pl-[90px]" />
+    </div>
   );
 }
 
