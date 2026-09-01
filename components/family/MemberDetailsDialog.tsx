@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Pencil, EyeOff, X, Plus, Mic, Send } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronRight, Clock, Pencil, EyeOff, X, Plus, Mic, Send } from "lucide-react";
 import { Modal } from "@/components/shared/Modal";
 import {
   addDetail,
@@ -226,6 +227,24 @@ export function MemberDetailsDialog({
             <Plus size={15} strokeWidth={2.5} /> Add detail
           </button>
         )}
+
+        <Link
+          href="/settings/arrival"
+          className="flex items-center justify-between gap-2 bg-mist border border-border rounded-[14px] px-3.5 py-3 mt-1"
+        >
+          <span className="flex items-center gap-2.5 min-w-0">
+            <span className="w-7 h-7 rounded-full bg-accent-gold/15 flex items-center justify-center shrink-0">
+              <Clock size={14} className="text-accent-gold" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13.5px] font-semibold text-ink">Arrival buffer rules</span>
+              <span className="block text-[11.5px] text-muted-label mt-0.5">
+                Household-wide arrival offsets by activity type
+              </span>
+            </span>
+          </span>
+          <ChevronRight size={16} className="text-muted-label shrink-0" />
+        </Link>
 
         {/* Freeform capture — visual only in this pass (Phase 3). */}
         <div className="mt-1">

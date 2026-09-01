@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getHomeLocation } from "@/lib/data/locations";
 import { getMemberDetails } from "@/lib/data/memberDetails";
@@ -30,24 +30,6 @@ export default async function ManageFamilyPage() {
       <HomeLocationCard address={home?.address ?? null} />
 
       <ManageFamilyClient members={familyMembers} detailsByMember={detailsByMember} />
-
-      <Link
-        href="/settings/arrival"
-        className="flex items-center justify-between bg-surface rounded-card p-4 shadow-sm shadow-black/5"
-      >
-        <span className="flex items-center gap-3">
-          <span className="w-[34px] h-[34px] rounded-full bg-accent-gold/15 flex items-center justify-center shrink-0">
-            <Clock size={17} className="text-accent-gold" />
-          </span>
-          <span>
-            <span className="block text-[14px] font-semibold text-ink">Arrival buffer rules</span>
-            <span className="block text-[12px] text-muted-label mt-0.5">
-              Default arrival-time offsets by category
-            </span>
-          </span>
-        </span>
-        <ChevronRight size={18} className="text-border shrink-0" />
-      </Link>
     </>
   );
 }
