@@ -15,9 +15,14 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-09-01) — pending-review actions + advisory/Today fixes (committed to `main`, NOT deployed)
+## Session status (2026-09-01) — pending-review actions + advisory/Today fixes (DEPLOYED)
 
-Batch of fixes from real-usage feedback. **Committed to `main` locally, not pushed, not deployed.** `tsc` / `eslint` / `next build` / **126 tests** green.
+Batch of fixes from real-usage feedback. **`main` @ `9022dab` pushed; deployed to
+production** — `dpl_HMvdcoLTDfGoC3WhZc1C92yaVeTp` (READY, aliased
+`family-chief-of-staff.vercel.app`). Smoke-checked: `/`, `/schedule`,
+`/notifications`, `/review`, `/todo` all 200; advisory pins on the Today tile and
+timed events render under the all-day strip. `tsc` / `eslint` / `next build` /
+**126 tests** green.
 
 ### What changed
 
