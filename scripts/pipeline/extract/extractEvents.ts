@@ -10,7 +10,10 @@ const ExtractedItemSchema = z.object({
   kind: z
     .enum(["event", "task", "reminder", "advisory"])
     .describe(
-      "event = something on the calendar (a game, appointment). task = an action item with a deadline (return a form). reminder = a small note tied to a date or an event (bring a water bottle). advisory = a non-personal heads-up affecting the household (a road closure, allow-extra-travel-time notice)."
+      "event = something that happens on the calendar at a date (a game, a practice, an appointment, a ceremony). " +
+        "task = an action someone must complete by a deadline (return a form, order spirit wear, submit a physical). " +
+        "reminder = a small note attached to ONE specific dated event you are also extracting from this same email — it rides along as a sub-line of that event ('wear chapel dress' for Picture Day, 'bring cleats' to Tuesday's game). " +
+        "advisory = a standalone, time-sensitive heads-up the family must see before they leave the house: what to wear or bring to a recurring activity (uniform colours, gear, a large water bottle, an instrument), a road/lane closure or 'allow extra travel time', a day-of early dismissal or schedule change, an 'arrive early / report by' notice not tied to a brand-new event. An advisory stands on its own; it is NOT a sub-line of another entry. A 'wear/bring X' note that applies to a standing recurring activity ('for practices', 'every game day') is an advisory, not a reminder."
     ),
   title: z.string(),
   person_hint: z.string().nullable().describe("Exact family member name if mentioned, else null"),
@@ -21,7 +24,9 @@ const ExtractedItemSchema = z.object({
   time: z
     .string()
     .nullable()
-    .describe("24-hour HH:mm start time — events/advisories only, only if a specific time is mentioned"),
+    .describe(
+      "24-hour HH:mm start time. Fill this whenever the source states or clearly implies a start time (\"7pm\", \"periods 1–4\", \"kickoff 3:30\", \"morning drop-off\"→08:00 only if a time is genuinely implied). Leave null ONLY for things that truly have no time — holidays, 'first day of school', spirit days, multi-day spans. Do not default to null just because the time is elsewhere in the email."
+    ),
   end_time: z
     .string()
     .nullable()
@@ -111,14 +116,18 @@ export async function extractItemsFromMessage(
 First, decide if this email is personal to the family — school, sports/activities, medical, a friend or relative, a service the family actually uses (e.g. a photo order, a permission slip). If it's marketing, a cold sales pitch, a newsletter, a promotional "offer expires" / "sale ends" message, or bulk/automated mail unrelated to the family's real life, extract nothing and return an empty items array — a countdown on a sales offer is not a family task, even though it has a date.
 
 Choose a "kind" per item:
-- event: something that happens on the calendar at a date (a game, a practice, an appointment, a school ceremony).
-- task: an action someone must do by a deadline (return a signed form, order spirit wear, submit a physical).
-- reminder: a small note tied to a date or to an event (bring a large water bottle, wear chapel dress).
-- advisory: a non-personal heads-up that affects getting around (a road/lane closure, "allow extra travel time", a construction notice). Advisories are about the household generally, not one person.
+- event: something that happens on the calendar at a date — a game, a practice, an appointment, a school ceremony.
+- task: an action someone must complete by a deadline — return a signed form, order spirit wear, submit a physical.
+- reminder: a small note attached to ONE specific dated event you are also extracting from this same email. It rides along as a sub-line of that event — "wear chapel dress" for Picture Day, "bring your cleats" to Tuesday's game. If there is no single specific event in this email for it to hang off, it is not a reminder.
+- advisory: a standalone, time-sensitive heads-up the family must catch before they leave the house. Examples: what to wear or bring to a recurring activity (team colours, uniform, a large water bottle, an instrument, cleats), a road/lane closure or "allow extra travel time", a day-of early dismissal or bell-schedule change, an "arrive early"/"report by" notice not tied to a brand-new event. An advisory stands on its own and is about the household or a recurring activity, not pinned to one calendar entry. A "wear/bring X" note for a standing activity ("for practices", "on game days", "every Chapel") is an advisory, not a reminder.
 
-Only extract items with a concrete, determinable date. Skip vague mentions with no date. The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
+When a "wear X" / "bring X" note could be either: if it points at one dated event → reminder; if it is a standing rule for something recurring → advisory.
+
+Only extract items with a concrete, determinable date. Skip vague mentions with no date. (An advisory still needs the date it starts applying — usually the email's own date or the first affected day.) The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
 
 Put stated facts in their structured fields, not in notes: an end time goes in end_time, a place in location, a "report by"/"doors open"/"call time" in arrival_time, and classify the activity into category. Do NOT compute a default arrival time — only fill arrival_time when the text explicitly states one.
+
+Set "time" whenever the source gives or clearly implies a start time — the entry is otherwise treated as all-day. Only leave time null for genuinely all-day things: holidays, first/last day of school, spirit/dress-up days, multi-day spans. If an email states a time anywhere for an event, that event gets that time.
 
 If a roster member's name is mentioned or clearly implied, set person_hint to their exact name; otherwise null. For every item, quote the exact source_excerpt that justifies it, and record whether it came from the email body or a specific attachment (and page, for PDFs).`,
     messages: [{ role: "user", content: buildPrompt(message) }],

@@ -4,7 +4,6 @@ import {
   endOfMonth,
   endOfWeek,
   eachDayOfInterval,
-  format,
   isSameDay,
   startOfDay,
   startOfMonth,
@@ -12,7 +11,7 @@ import {
   subDays,
   subMonths,
 } from "date-fns";
-import { getEventsInRange, getLinkableEntries } from "@/lib/data/events";
+import { getEventsInRange, getLinkableOptions } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { parseDateParam, formatDateParam } from "@/lib/dateParam";
@@ -47,16 +46,11 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   const person = typeof searchParams.person === "string" ? searchParams.person : "all";
   const date = parseDateParam(typeof searchParams.date === "string" ? searchParams.date : undefined);
 
-  const [familyMembers, arrivalRules, linkables] = await Promise.all([
+  const [familyMembers, arrivalRules, linkableOptions] = await Promise.all([
     getFamilyMembers(),
     getArrivalBufferRules(),
-    getLinkableEntries(),
+    getLinkableOptions(),
   ]);
-  const linkableOptions = linkables.map((e) => ({
-    id: e.id,
-    title: e.title,
-    when: e.allDay ? format(new Date(e.startsAt), "MMM d") : format(new Date(e.startsAt), "MMM d, h:mm a"),
-  }));
 
   function buildHref(overrides: { view?: ScheduleViewMode; date?: Date; person?: string }) {
     const params = new URLSearchParams({

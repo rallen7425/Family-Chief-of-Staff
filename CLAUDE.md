@@ -15,6 +15,65 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-01) — pending-review actions + advisory/Today fixes (committed to `main`, NOT deployed)
+
+Batch of fixes from real-usage feedback. **Committed to `main` locally, not pushed, not deployed.** `tsc` / `eslint` / `next build` / **126 tests** green.
+
+### What changed
+
+- **Approve / dismiss / reclassify from the entry modal** (`EntryDetailsModal.tsx`,
+  `lib/actions/entries.ts`). A `pending_review` entry now shows an "Auto-detected —
+  not on the schedule yet" panel with Approve / Dismiss (existing `confirmEntry` /
+  `dismissEntry`) + a "Change from &lt;kind&gt;" control calling the **new
+  `reclassifyEntry(id, kind)`** action (clears fields that don't apply to the target
+  kind — subject/category/owners for advisory, due_at↔starts_at for task, etc.).
+  Shown in both the detail view and the top of the edit view.
+- **Today Schedule card no longer hidden behind all-day items** (`lib/schedulePreview.ts`,
+  `components/today/ScheduleCard.tsx`). `SchedulePreview` now returns `DayBands`
+  (`{ heads, timed }`) per day — `heads` = all-day entries + every advisory, in a
+  muted strip; `timed` = real timed events — **capped separately** so midnight-sorted
+  all-day rows can't consume the whole cap (the bug: 4 all-day rows = 0 timed events
+  shown). `LOOKAHEAD_MAX` 2→3.
+- **Advisories pinned on Today** (`lib/notifications.ts`). An advisory whose applicable
+  moment is within `ADVISORY_PIN_WINDOW_MS` (36h) / already active is forced into the
+  Today tile's `important` list ahead of the ranked slots — a busy day was pushing it
+  into `more`, defeating the "catch the family before they leave" purpose. Advisories
+  further out still rank normally.
+- **"About" linker cleanup** (`lib/data/events.ts`, `EntryForm.tsx`, `app/page.tsx`,
+  `app/schedule/page.tsx`). `getLinkableEntries` windowed to yesterday→+90d, cap
+  200→40+40. New shared `getLinkableOptions()` used by **both** Today and Schedule so
+  a reminder's edit form matches wherever it's opened (Today previously passed no
+  linkables at all). Picker is now collapsed-by-default (dashed "+ Link to an event
+  or task" → scrollable list) instead of an unbounded wall of pills.
+- **Extraction prompt: advisory vs reminder** (`scripts/pipeline/extract/extractEvents.ts`).
+  advisory = standalone time-sensitive pre-departure heads-up (what to wear/bring to a
+  recurring activity, closures, day-of schedule changes) — stands alone. reminder = a
+  note tied to ONE specific dated event in the same email. Standing "for practices" /
+  "on game days" rules → advisory. `time` instruction tightened to fill whenever a
+  time is stated anywhere for the event (was over-flagging timed events as all-day).
+  **Prompt-only — does not reclassify existing rows.**
+
+### Live-data changes made this session (prod Supabase)
+
+- `scripts/maintenance/dedupe-entries.ts` (new, one-off, dry-run by default) — ran
+  `--apply`: **6 cross-email duplicate rows set to `dismissed`** (reversible), keeping
+  the earliest confirmed copy: "Order Ben's football photos" ×3→1, "Student
+  Orientation" ×2→1, "Convocation - Chapel Dress Required" ×2→1, "School Picture Day -
+  Chapel Dress Required" ×2→1, "First EF coach meeting with Francesco Donati" ×2→1.
+  Cross-email dedupe in the pipeline itself is still an unbuilt follow-up.
+- Reclassified "Wear black, white, or green for practices" (`cbca6919…`) reminder →
+  advisory via the new UI (cleared subject/category, kept date, still `pending_review`).
+
+### Not done
+
+- `git push` + `vercel --prod` — user is reviewing first.
+- Retroactive `is_all_day` fix on existing mis-flagged timed events — the original
+  time is unrecoverable; fixed forward via the prompt only.
+- `.claude/launch.json` created locally (dev preview) — machine-specific homebrew
+  path, intentionally left untracked.
+
+---
+
 ## Session status (2026-08-30) — Profile & Family Management (DEPLOYED)
 
 Built `profile-family-management-implementation-prompt.md` (+ `profile-family-management-plan.md`

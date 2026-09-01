@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Filter, Info } from "lucide-react";
 import { format } from "date-fns";
 import type { CalendarEvent, FamilyMember } from "@/lib/types";
-import type { SchedulePreview } from "@/lib/schedulePreview";
+import type { DayBands, SchedulePreview } from "@/lib/schedulePreview";
 import { ACCENT_HEX } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
 import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
@@ -10,6 +10,26 @@ import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 interface ScheduleCardProps {
   preview: SchedulePreview;
   familyMembers: FamilyMember[];
+}
+
+/** A row in the "heads" strip — all-day entries + advisories. Muted, compact,
+ * no person colour. Still opens the details modal (approve / edit / delete). */
+function HeadsRow({ event, familyMembers }: { event: CalendarEvent; familyMembers: FamilyMember[] }) {
+  const isAdvisory = event.kind === "advisory";
+  return (
+    <EventRow event={event} familyMembers={familyMembers}>
+      <div className="flex gap-3 items-start">
+        <div className="w-12 shrink-0 text-right text-[12px] text-muted-label font-medium pt-0.5">
+          {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
+        </div>
+        <p className="flex-1 flex items-center gap-1.5 text-[14px] text-muted-text leading-tight">
+          {isAdvisory && <Info size={13} className="shrink-0 text-muted-label" />}
+          {event.title}
+          <UnconfirmedTag status={event.status} />
+        </p>
+      </div>
+    </EventRow>
+  );
 }
 
 function ScheduleEventRow({
@@ -21,7 +41,6 @@ function ScheduleEventRow({
   familyMembers: FamilyMember[];
   memberById: Map<string, FamilyMember>;
 }) {
-  const isAdvisory = event.kind === "advisory";
   const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
   const startDate = new Date(event.startsAt);
 
@@ -30,26 +49,18 @@ function ScheduleEventRow({
       <div className="flex gap-4 items-start relative">
         <div className="w-14 shrink-0 text-right leading-tight pt-1">
           <div className="text-[13px] text-muted-label font-medium">
-            {event.allDay ? "All day" : format(startDate, "h:mma").toLowerCase()}
+            {format(startDate, "h:mma").toLowerCase()}
           </div>
         </div>
         <div
-          className={`w-[3px] self-stretch rounded-full mt-1 ${isAdvisory || !member ? "bg-border" : ""}`}
-          style={!isAdvisory && member ? { background: ACCENT_HEX[member.accentColor] } : undefined}
+          className={`w-[3px] self-stretch rounded-full mt-1 ${member ? "" : "bg-border"}`}
+          style={member ? { background: ACCENT_HEX[member.accentColor] } : undefined}
         />
         <div className="flex-1 pb-2">
-          {isAdvisory ? (
-            <p className="flex items-center gap-1.5 text-[15px] text-muted-text leading-tight">
-              <Info size={14} className="shrink-0 text-muted-label" />
-              {event.title}
-              <UnconfirmedTag status={event.status} />
-            </p>
-          ) : (
-            <div className="flex items-start gap-1.5 flex-wrap mb-1">
-              <h3 className="font-semibold text-[17px] text-ink leading-tight">{event.title}</h3>
-              <UnconfirmedTag status={event.status} className="mt-1" />
-            </div>
-          )}
+          <div className="flex items-start gap-1.5 flex-wrap mb-1">
+            <h3 className="font-semibold text-[17px] text-ink leading-tight">{event.title}</h3>
+            <UnconfirmedTag status={event.status} className="mt-1" />
+          </div>
           {event.location && <p className="text-[14px] text-muted-label">{event.location}</p>}
         </div>
       </div>
@@ -59,33 +70,45 @@ function ScheduleEventRow({
 
 function DaySection({
   label,
-  events,
+  bands,
   emptyMessage,
   familyMembers,
   memberById,
 }: {
   label: string;
-  events: CalendarEvent[];
+  bands: DayBands;
   emptyMessage: string;
   familyMembers: FamilyMember[];
   memberById: Map<string, FamilyMember>;
 }) {
+  const { heads, timed } = bands;
   return (
     <div>
       <h3 className="text-[11px] font-bold tracking-widest text-muted-label uppercase mb-3">{label}</h3>
-      {events.length === 0 ? (
+      {heads.length === 0 && timed.length === 0 ? (
         <p className="text-[14px] text-muted-label">{emptyMessage}</p>
       ) : (
-        <div className="flex flex-col gap-6">
-          {events.map((event) => (
-            <ScheduleEventRow
-              key={event.id}
-              event={event}
-              familyMembers={familyMembers}
-              memberById={memberById}
-            />
-          ))}
-        </div>
+        <>
+          {heads.length > 0 && (
+            <div className="mb-4 flex flex-col gap-2 rounded-input border border-border bg-mist/50 px-3 py-2.5">
+              {heads.map((event) => (
+                <HeadsRow key={event.id} event={event} familyMembers={familyMembers} />
+              ))}
+            </div>
+          )}
+          {timed.length > 0 && (
+            <div className="flex flex-col gap-6">
+              {timed.map((event) => (
+                <ScheduleEventRow
+                  key={event.id}
+                  event={event}
+                  familyMembers={familyMembers}
+                  memberById={memberById}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -116,7 +139,7 @@ export function ScheduleCard({ preview, familyMembers }: ScheduleCardProps) {
         <div className="flex flex-col gap-7">
           <DaySection
             label="Today"
-            events={today}
+            bands={today}
             emptyMessage="Nothing left today."
             familyMembers={familyMembers}
             memberById={memberById}
@@ -124,7 +147,7 @@ export function ScheduleCard({ preview, familyMembers }: ScheduleCardProps) {
           {tomorrow !== null && (
             <DaySection
               label="Tomorrow"
-              events={tomorrow}
+              bands={tomorrow}
               emptyMessage="Nothing tomorrow."
               familyMembers={familyMembers}
               memberById={memberById}

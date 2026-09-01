@@ -113,6 +113,7 @@ export function EntryForm({
   const [location, setLocation] = useState(init.location);
   const [notes, setNotes] = useState(init.notes);
   const [linkedEntryId, setLinkedEntryId] = useState(init.linkedEntryId);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [repeatsWeekly, setRepeatsWeekly] = useState(init.repeatsWeekly);
   const [repeatUntil, setRepeatUntil] = useState(init.repeatUntil);
   const [error, setError] = useState<string | null>(null);
@@ -287,29 +288,74 @@ export function EntryForm({
       {isReminder && (
         <div>
           <label className={FORM_LABEL_CLASS}>About (optional)</label>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => setLinkedEntryId("")}
-              className={`px-3 py-1.5 rounded-pill text-[13px] border transition-colors ${
-                linkedEntryId === "" ? "bg-primary text-white border-primary" : "border-border text-muted-text hover:bg-mist"
-              }`}
-            >
-              Standalone (no link)
-            </button>
-            {linkables.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => setLinkedEntryId(l.id)}
-                className={`px-3 py-1.5 rounded-pill text-[13px] border transition-colors ${
-                  linkedEntryId === l.id ? "bg-primary text-white border-primary" : "border-border text-muted-text hover:bg-mist"
-                }`}
-              >
-                {l.title} <span className="opacity-70">· {l.when}</span>
-              </button>
-            ))}
-          </div>
+          {(() => {
+            const linked = linkables.find((l) => l.id === linkedEntryId);
+            if (linkedEntryId && !aboutOpen) {
+              return (
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 min-w-0 truncate text-[14px] text-ink rounded-input border border-border bg-mist/50 px-3 py-2">
+                    {linked ? `${linked.title} · ${linked.when}` : "Linked entry"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAboutOpen(true)}
+                    className="shrink-0 text-[13px] font-semibold text-primary hover:underline"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLinkedEntryId("")}
+                    className="shrink-0 text-[13px] font-semibold text-muted-text hover:underline"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              );
+            }
+            if (!aboutOpen) {
+              return (
+                <button
+                  type="button"
+                  onClick={() => setAboutOpen(true)}
+                  className="w-full text-left text-[14px] text-muted-text rounded-input border border-dashed border-border px-3 py-2 hover:bg-mist transition-colors"
+                >
+                  + Link to an event or task
+                </button>
+              );
+            }
+            return (
+              <div className="rounded-input border border-border divide-y divide-border max-h-44 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLinkedEntryId("");
+                    setAboutOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-mist ${
+                    linkedEntryId === "" ? "text-primary font-semibold" : "text-muted-text"
+                  }`}
+                >
+                  Standalone (no link)
+                </button>
+                {linkables.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => {
+                      setLinkedEntryId(l.id);
+                      setAboutOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-[13px] transition-colors hover:bg-mist ${
+                      linkedEntryId === l.id ? "text-primary font-semibold" : "text-muted-text"
+                    }`}
+                  >
+                    {l.title} <span className="opacity-70">· {l.when}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 

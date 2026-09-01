@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { addDays, startOfDay, endOfDay } from "date-fns";
+import { addDays, subDays, startOfDay, endOfDay, format } from "date-fns";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { isEventVisibleToViewer } from "@/lib/visibility";
@@ -203,18 +203,59 @@ export const getPendingReviewEntries = cache(async (): Promise<CalendarEvent[]> 
   return dropPastReviewEntries(data.map(mapEvent));
 });
 
-/** Confirmed events + advisories (not reminders) a reminder can be linked
- * to via EntryForm's "About" picker. Small household volume → a wide window. */
-export async function getLinkableEntries(): Promise<CalendarEvent[]> {
+/** Events + tasks a reminder can be linked to via EntryForm's "About"
+ * picker. Bounded to a sane window — yesterday through +90d — so the picker
+ * is a short, relevant list rather than every entry ever scanned. */
+export async function getLinkableEntries(now: Date = new Date()): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("entries")
-    .select(SELECT_WITH_OWNERS)
-    .in("kind", ["event", "task"])
-    .neq("status", "dismissed")
-    .order("starts_at", { nullsFirst: false })
-    .limit(200)
-    .returns<EntryRowWithOwners[]>();
-  if (error) throw error;
-  return data.map(mapEvent);
+  const floor = startOfDay(subDays(now, 1));
+  const ceil = endOfDay(addDays(now, 90));
+  const floorDate = format(floor, "yyyy-MM-dd");
+
+  const [events, tasks] = await Promise.all([
+    supabase
+      .from("entries")
+      .select(SELECT_WITH_OWNERS)
+      .in("kind", ["event", "advisory"])
+      .neq("status", "dismissed")
+      .gte("starts_at", floor.toISOString())
+      .lte("starts_at", ceil.toISOString())
+      .order("starts_at")
+      .limit(40)
+      .returns<EntryRowWithOwners[]>(),
+    supabase
+      .from("entries")
+      .select(SELECT_WITH_OWNERS)
+      .eq("kind", "task")
+      .neq("status", "dismissed")
+      .gte("due_at", floorDate)
+      .order("due_at")
+      .limit(40)
+      .returns<EntryRowWithOwners[]>(),
+  ]);
+  if (events.error) throw events.error;
+  if (tasks.error) throw tasks.error;
+  return [...events.data, ...tasks.data].map(mapEvent);
+}
+
+export interface LinkableOption {
+  id: string;
+  title: string;
+  when: string;
+}
+
+/** The linkable list already shaped for EntryForm's picker. Shared by the
+ * Schedule and Today pages so a reminder's "About" control looks the same
+ * wherever it's opened from. */
+export async function getLinkableOptions(now: Date = new Date()): Promise<LinkableOption[]> {
+  const entries = await getLinkableEntries(now);
+  return entries.map((e) => {
+    const anchor = e.kind === "task" ? e.dueDate : undefined;
+    const when = anchor
+      ? format(new Date(`${anchor}T00:00:00`), "MMM d")
+      : e.allDay
+        ? format(new Date(e.startsAt), "MMM d")
+        : format(new Date(e.startsAt), "MMM d, h:mm a");
+    return { id: e.id, title: e.title, when };
+  });
 }

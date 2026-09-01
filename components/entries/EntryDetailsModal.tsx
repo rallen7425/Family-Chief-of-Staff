@@ -3,15 +3,15 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronDown, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Trash2, X } from "lucide-react";
 import { Modal } from "@/components/shared/Modal";
 import { EntryForm, type EntryFormInitialValues, type LinkableEntry } from "@/components/entries/EntryForm";
-import { updateEntry, deleteEntry } from "@/lib/actions/entries";
+import { updateEntry, deleteEntry, confirmEntry, dismissEntry, reclassifyEntry } from "@/lib/actions/entries";
 import { describeVisibility } from "@/lib/visibility";
 import { ACCENT_HEX } from "@/lib/colors";
 import { ASSISTANT_NAME } from "@/lib/config";
 import type { ArrivalBufferRule } from "@/lib/arrival";
-import type { CalendarEvent, FamilyMember, SourceType } from "@/lib/types";
+import type { CalendarEvent, EntryKind, FamilyMember, SourceType } from "@/lib/types";
 
 interface EntryDetailsModalProps {
   event: CalendarEvent;
@@ -116,6 +116,90 @@ function DeleteEntrySection({ event, onDeleted }: { event: CalendarEvent; onDele
   );
 }
 
+/** Approve / dismiss (and reclassify) an entry that's still awaiting review,
+ * without going through the full Edit form. Auto-detected entries land as
+ * `pending_review`; this is the one-tap accept/reject the schedule + Today
+ * rows were missing. */
+function PendingReviewActions({
+  event,
+  onResolved,
+  compact = false,
+}: {
+  event: CalendarEvent;
+  onResolved: () => void;
+  compact?: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [showKinds, setShowKinds] = useState(false);
+
+  function run(fn: () => Promise<unknown>) {
+    setError(null);
+    startTransition(async () => {
+      const result = (await fn()) as { error?: string } | void;
+      if (result && result.error) return setError(result.error);
+      onResolved();
+    });
+  }
+
+  return (
+    <div className="rounded-input bg-accent-gold/10 border border-accent-gold/30 p-3.5 flex flex-col gap-2.5">
+      <p className="text-[13px] font-semibold text-ink">
+        Auto-detected — not on the schedule yet.
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => run(() => confirmEntry(event.id))}
+          disabled={isPending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-input bg-primary text-white font-semibold text-[14px] hover:bg-primary-hover transition-colors disabled:opacity-60"
+        >
+          <Check size={15} /> Approve
+        </button>
+        <button
+          type="button"
+          onClick={() => run(() => dismissEntry(event.id))}
+          disabled={isPending}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-input border border-border text-muted-text font-semibold text-[14px] hover:bg-mist transition-colors disabled:opacity-60"
+        >
+          <X size={15} /> Dismiss
+        </button>
+      </div>
+      {!compact && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowKinds((v) => !v)}
+            className="text-[12px] font-semibold text-muted-text hover:text-primary transition-colors"
+          >
+            {showKinds ? "Keep as " : "Not the right type? Change from "}
+            {KIND_LABEL[event.kind]}
+            {showKinds ? "" : " →"}
+          </button>
+          {showKinds && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(Object.keys(KIND_LABEL) as EntryKind[])
+                .filter((k) => k !== event.kind)
+                .map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => run(() => reclassifyEntry(event.id, k))}
+                    disabled={isPending}
+                    className="px-3 py-1.5 rounded-pill text-[13px] border border-border text-muted-text hover:bg-mist transition-colors disabled:opacity-60"
+                  >
+                    {KIND_LABEL[k]}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+      {error && <p className="text-[13px] text-accent-berry font-medium">{error}</p>}
+    </div>
+  );
+}
+
 /** Mount only while `open` so `editing` re-initializes from
  * `startInEditMode` each time it's opened (see EventRow / ReviewList). */
 export function EntryDetailsModal({
@@ -133,8 +217,14 @@ export function EntryDetailsModal({
 
   const member = event.familyMemberId ? familyMembers.find((m) => m.id === event.familyMemberId) : undefined;
   const isAdvisory = event.kind === "advisory";
+  const isPendingReview = event.status === "pending_review";
 
   function closeAfterDelete() {
+    router.refresh();
+    onClose();
+  }
+
+  function resolveReview() {
     router.refresh();
     onClose();
   }
@@ -166,6 +256,7 @@ export function EntryDetailsModal({
     return (
       <Modal open={open} onClose={onClose} title={`Edit ${KIND_LABEL[event.kind].toLowerCase()}`}>
         <div className="flex flex-col gap-4">
+          {isPendingReview && <PendingReviewActions event={event} onResolved={resolveReview} compact />}
           <EntryForm
             mode="edit"
             familyMembers={familyMembers}
@@ -219,6 +310,8 @@ export function EntryDetailsModal({
             </span>
           )}
         </div>
+
+        {isPendingReview && <PendingReviewActions event={event} onResolved={resolveReview} />}
 
         {ownerNames.length > 0 && (
           <p className="text-[13px] text-muted-label">

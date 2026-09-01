@@ -42,6 +42,10 @@ export interface Notification {
 export const IMPORTANT_LIMIT = 3;
 export const ACTION_WINDOW_HOURS = 6;
 const ADVISORY_TTL_MS = 24 * 60 * 60 * 1000;
+/** An advisory this close to (or past) its applicable moment is pinned into
+ * the Today tile ahead of the ranked slots — advisories are the "catch the
+ * family before they leave" band, so a busy day must not bury them. */
+const ADVISORY_PIN_WINDOW_MS = 36 * 60 * 60 * 1000;
 const FAR_FUTURE = Number.MAX_SAFE_INTEGER;
 
 const HOUSEHOLD_TIMEZONE = process.env.HOUSEHOLD_TIMEZONE || "America/New_York";
@@ -195,26 +199,41 @@ export interface RankedNotifications {
 
 export function assembleNotifications(sources: NotificationSources, now: Date): RankedNotifications {
   const reviewNudge = buildReviewNudge(sources.pendingCount, now);
+  const nowMs = now.getTime();
+  const isVisible = (n: Notification) =>
+    n.expiresAt > nowMs && !(n.dismissible && sources.dismissed.has(n.id));
 
-  const raw: Notification[] = [
-    ...sources.advisories
-      .map((a) => buildAdvisoryNotification(a, now))
-      .filter((n): n is Notification => n !== null),
+  const advisoryNotifs = sources.advisories
+    .map((a) => buildAdvisoryNotification(a, now))
+    .filter((n): n is Notification => n !== null)
+    .filter(isVisible);
+
+  // Advisories whose applicable moment is already here (or within the pin
+  // window) are always shown on Today, ahead of the ranked slots. Advisories
+  // further out fall back into the normal ranking.
+  const pinned = rankNotifications(
+    advisoryNotifs.filter((n) => n.at <= nowMs + ADVISORY_PIN_WINDOW_MS),
+    now
+  );
+  const pinnedIds = new Set(pinned.map((n) => n.id));
+
+  const rankable: Notification[] = [
+    ...advisoryNotifs.filter((n) => !pinnedIds.has(n.id)),
     ...sources.actionsSoon.map((e) => buildActionSoonNotification(e)),
     ...sources.urgentTodos.map((t) => buildDeadlineNotification(t, now)),
     ...sources.systemItems.map((i) => buildSystemNotification(i, now)),
-  ];
+  ].filter(isVisible);
+  const ranked = rankNotifications(rankable, now);
 
-  const visible = raw.filter(
-    (n) => n.expiresAt > now.getTime() && !(n.dismissible && sources.dismissed.has(n.id))
-  );
-  const ranked = rankNotifications(visible, now);
+  const roomForRanked = Math.max(0, IMPORTANT_LIMIT - pinned.length);
+  const important = [...pinned, ...ranked.slice(0, roomForRanked)];
+  const more = ranked.slice(roomForRanked);
 
   return {
     reviewNudge,
-    important: ranked.slice(0, IMPORTANT_LIMIT),
-    more: ranked.slice(IMPORTANT_LIMIT),
-    total: (reviewNudge ? 1 : 0) + ranked.length,
+    important,
+    more,
+    total: (reviewNudge ? 1 : 0) + important.length + more.length,
   };
 }
 

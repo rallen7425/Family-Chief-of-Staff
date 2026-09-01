@@ -236,6 +236,39 @@ describe("assembleNotifications", () => {
     expect([...r.important, ...r.more]).toHaveLength(0);
   });
 
+  it("pins an imminent advisory into important even when ranked slots are full", () => {
+    const todos = Array.from({ length: IMPORTANT_LIMIT + 2 }, (_, i) =>
+      mkTodo({ id: `t${i}`, title: `Task ${i}`, dueDate: "2026-08-29" })
+    );
+    const r = assembleNotifications(
+      {
+        ...base,
+        urgentTodos: todos,
+        advisories: [mkEvent({ id: "a1", kind: "advisory", startsAt: iso(3 * H), createdAt: iso(-1 * H) })],
+      },
+      NOW
+    );
+    expect(r.important.map((n) => n.id)).toContain("advisory:a1");
+    expect(r.more.map((n) => n.id)).not.toContain("advisory:a1");
+    expect(r.important).toHaveLength(IMPORTANT_LIMIT);
+  });
+
+  it("does not pin an advisory whose applicable moment is days out", () => {
+    const todos = Array.from({ length: IMPORTANT_LIMIT }, (_, i) =>
+      mkTodo({ id: `t${i}`, title: `Task ${i}`, dueDate: "2026-08-28" })
+    );
+    const r = assembleNotifications(
+      {
+        ...base,
+        urgentTodos: todos,
+        advisories: [mkEvent({ id: "a1", kind: "advisory", allDay: true, startsAt: iso(72 * H), createdAt: iso(-1 * H) })],
+      },
+      NOW
+    );
+    expect(r.important.map((n) => n.id)).not.toContain("advisory:a1");
+    expect(r.more.map((n) => n.id)).toContain("advisory:a1");
+  });
+
   it("hides a dismissed dismissible notification but never an advisory or the review nudge", () => {
     const r = assembleNotifications(
       {

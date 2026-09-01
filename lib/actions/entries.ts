@@ -6,7 +6,7 @@ import { buildEntryRows } from "@/lib/events/recurrence";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { inferArrivalAt } from "@/lib/arrival";
-import type { EntryInput, SourceDetail, SourceType } from "@/lib/types";
+import type { EntryInput, EntryKind, SourceDetail, SourceType } from "@/lib/types";
 
 function revalidateEntryViews() {
   revalidatePath("/");
@@ -171,4 +171,71 @@ export async function dismissEntry(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw error;
   revalidateEntryViews();
+}
+
+/**
+ * Change an entry's kind. The email scan sometimes guesses wrong (a standing
+ * "wear team colors" heads-up filed as a reminder rather than an advisory),
+ * and kind is otherwise immutable after creation — this is the escape hatch,
+ * intended for use while an entry is still `pending_review`.
+ *
+ * Fields that don't structurally apply to the target kind are cleared so the
+ * row stays coherent; the reviewer can fix specifics via Edit afterward.
+ */
+export async function reclassifyEntry(id: string, kind: EntryKind): Promise<{ error?: string }> {
+  const supabase = getSupabaseClient();
+  const { data: current, error: readErr } = await supabase
+    .from("entries")
+    .select("starts_at, due_at")
+    .eq("id", id)
+    .single();
+  if (readErr) return { error: readErr.message };
+
+  const patch: Record<string, unknown> = { kind, updated_at: new Date().toISOString() };
+
+  if (kind === "task") {
+    // Tasks live on a due date, never a datetime.
+    patch.due_at = current.due_at ?? (current.starts_at ? current.starts_at.slice(0, 10) : null);
+    patch.starts_at = null;
+    patch.ends_at = null;
+    patch.is_all_day = false;
+    patch.busy_status = "free";
+    patch.arrival_at = null;
+    patch.arrival_source = null;
+    patch.linked_entry_id = null;
+  } else {
+    // event / reminder / advisory all sit on the schedule at a datetime.
+    if (!current.starts_at && current.due_at) patch.starts_at = `${current.due_at}T00:00:00`;
+    patch.due_at = null;
+  }
+
+  if (kind === "advisory") {
+    // Advisories are household-wide: no subject, no owners, no category.
+    patch.subject_member_id = null;
+    patch.category = null;
+    patch.arrival_at = null;
+    patch.arrival_source = null;
+    patch.linked_entry_id = null;
+    patch.busy_status = "free";
+  }
+
+  if (kind === "reminder") {
+    patch.arrival_at = null;
+    patch.arrival_source = null;
+    patch.busy_status = "free";
+  }
+
+  if (kind === "event") {
+    patch.linked_entry_id = null;
+  }
+
+  const { error } = await supabase.from("entries").update(patch).eq("id", id);
+  if (error) return { error: error.message };
+
+  if (kind === "advisory" || kind === "reminder") {
+    await supabase.from("entry_owners").delete().eq("entry_id", id);
+  }
+
+  revalidateEntryViews();
+  return {};
 }
