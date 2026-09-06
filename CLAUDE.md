@@ -46,6 +46,19 @@ Only cookie/curl-verified so far; needs a real device against
 
 If all four pass, this session's work is fully closed.
 
+### Then — next workstream: real email + calendar connectors
+
+After verification, build **adding and managing email / calendar connectors**.
+Today `/settings/accounts` ("Manage Connected Accounts") is a **mock** — one real
+`gmail_credentials` row attributed to the matching adult, everyone else "Not
+connected" with a disabled Connect button; no per-member OAuth. The pipeline reads
+one shared inbox (`rallen7425@gmail.com`). Target: each household member does their
+own one-time sign-in for their own mailbox + calendar, and the connectors are
+manageable (add / reconnect / remove) from that page. This overlaps the auth /
+onboarding workstream and the deferred P1.5 calendar integration — scope it at the
+start of that session (per-member OAuth client, token storage per member, pipeline
+fan-out over multiple mailboxes, calendar read).
+
 ### Bug 1 — holiday-date resolution + reminder linking (PR #2, `8226061`)
 
 - **"Labor Day Kickoff Party"** (+ its bathing-suit reminder) landed on the email's
