@@ -15,14 +15,15 @@ export default async function ArrivalSettingsPage() {
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-display font-semibold text-[24px] leading-tight text-ink">
-          Arrival buffer rules
+          Arrival buffer defaults
         </h1>
       </div>
 
       <section className="flex flex-col gap-3">
         <p className="text-[13px] text-muted-text leading-relaxed">
-          When an entry doesn&rsquo;t state an arrival time, these defaults fill it in — a category rule beats
-          the general default; you can always edit a single entry&rsquo;s arrival time by hand.
+          When an entry doesn&rsquo;t state an arrival time, these defaults fill it in. An entry linked
+          to a specific activity uses that activity&rsquo;s own buffer first; otherwise a category rule
+          beats the general default. You can always edit a single entry&rsquo;s arrival time by hand.
         </p>
         <ArrivalRulesEditor rules={rules} />
       </section>
