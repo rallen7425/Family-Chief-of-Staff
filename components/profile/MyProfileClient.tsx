@@ -67,15 +67,6 @@ export function MyProfileClient({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={() => setForgetOpen(true)}
-        className="flex items-center gap-2 py-1.5 text-accent-berry text-[13.5px] font-semibold self-start"
-      >
-        <Shield size={16} />
-        Forget my info
-      </button>
-
       <div className="bg-surface rounded-card p-5 shadow-sm shadow-black/5">
         <p className="text-[12px] font-semibold text-muted-text uppercase tracking-[0.03em] mb-3">
           Switch profile
@@ -111,11 +102,20 @@ export function MyProfileClient({
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setForgetOpen(true)}
+        className="flex items-center gap-2 py-1.5 text-accent-berry text-[13.5px] font-semibold self-start"
+      >
+        <Shield size={16} />
+        Forget information
+      </button>
+
       <ForgetDialog
         open={forgetOpen}
         onClose={() => setForgetOpen(false)}
         members={members}
-        preselectedMemberId={member.id}
+        defaultMemberId={member.id}
       />
     </>
   );

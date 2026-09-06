@@ -4,6 +4,7 @@ import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_HEX } from "@/lib/colors";
 import { EventRow } from "@/components/events/EventRow";
 import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
+import { PendingRowActions } from "@/components/events/PendingRowActions";
 import { AdvisorySummary } from "@/components/schedule/AdvisorySummary";
 
 interface DayGroupProps {
@@ -65,7 +66,8 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
             const member = event.familyMemberId ? memberById.get(event.familyMemberId) : undefined;
             const isStandaloneReminder = event.kind === "reminder";
             return (
-              <EventRow key={event.id} event={event} familyMembers={familyMembers}>
+              <div key={event.id}>
+              <EventRow event={event} familyMembers={familyMembers}>
                 <div className="flex gap-4 items-start">
                   <div className="w-14 text-[13px] text-muted-label font-medium pt-0.5 shrink-0 text-right">
                     {event.allDay ? "All day" : format(new Date(event.startsAt), "h:mma").toLowerCase()}
@@ -101,6 +103,12 @@ export function DayGroup({ date, events, familyMembers, showDateHeader = true }:
                   </div>
                 </div>
               </EventRow>
+              <PendingRowActions
+                entryId={event.id}
+                status={event.status}
+                className="mt-2 pl-[90px]"
+              />
+              </div>
             );
           })}
         </div>

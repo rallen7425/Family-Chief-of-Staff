@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings, Mail, Bell } from "lucide-react";
+import { Menu, Mail, Bell } from "lucide-react";
 import { initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
 import type { FamilyMember } from "@/lib/types";
@@ -14,10 +14,10 @@ export function AppHeader({ pendingReviewCount, activeMember }: AppHeaderProps) 
     <div className="flex justify-between items-center w-full px-4 py-3">
       <Link
         href="/settings"
-        aria-label="Settings"
+        aria-label="Menu"
         className="text-ink hover:text-primary transition-colors flex items-center"
       >
-        <Settings size={24} strokeWidth={2} />
+        <Menu size={24} strokeWidth={2} />
       </Link>
       <div className="flex items-center gap-2">
         <button
