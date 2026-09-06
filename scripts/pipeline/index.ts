@@ -41,6 +41,9 @@ export interface PipelineResult {
   errors: number;
   eventsCreated: number;
   todosCreated: number;
+  /** New items folded into an existing entry by cross-email dedupe instead
+   * of inserted as a new row. */
+  merged: number;
   details: { messageId: string; status: "processed" | "skipped" | "error" | "deferred"; note?: string }[];
 }
 
@@ -50,6 +53,7 @@ interface MessageOutcome {
   note: string;
   eventsCreated: number;
   todosCreated: number;
+  merged: number;
 }
 
 async function processMessage(
@@ -87,7 +91,7 @@ async function processMessage(
       familyMembers
     );
 
-    const { eventsCreated, todosCreated } = await writeExtractedItems(
+    const { eventsCreated, todosCreated, merged } = await writeExtractedItems(
       items,
       {
         gmailMessageId: message.id,
@@ -116,9 +120,10 @@ async function processMessage(
     return {
       messageId,
       status: "processed",
-      note: `${eventsCreated} event(s), ${todosCreated} todo(s)`,
+      note: `${eventsCreated} event(s), ${todosCreated} todo(s)${merged ? `, ${merged} merged into existing` : ""}`,
       eventsCreated,
       todosCreated,
+      merged,
     };
   } catch (err) {
     // One message's failure shouldn't block the rest of the run.
@@ -128,7 +133,7 @@ async function processMessage(
       status: "error",
       error_detail: errorDetail,
     });
-    return { messageId, status: "error", note: errorDetail, eventsCreated: 0, todosCreated: 0 };
+    return { messageId, status: "error", note: errorDetail, eventsCreated: 0, todosCreated: 0, merged: 0 };
   }
 }
 
@@ -151,6 +156,7 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
     errors: 0,
     eventsCreated: 0,
     todosCreated: 0,
+    merged: 0,
     details: [],
   };
 
@@ -190,6 +196,7 @@ export async function runGmailScanPipeline(): Promise<PipelineResult> {
       result.processed++;
       result.eventsCreated += outcome.eventsCreated;
       result.todosCreated += outcome.todosCreated;
+      result.merged += outcome.merged;
     } else {
       result.errors++;
     }
