@@ -20,7 +20,7 @@ const ExtractedItemSchema = z.object({
   date: z
     .string()
     .nullable()
-    .describe("ISO date YYYY-MM-DD this item occurs/is due on. Resolve relative dates using the email's own date context. Null if no date is determinable."),
+    .describe("ISO date YYYY-MM-DD this item occurs/is due on. Resolve relative dates using the email's own date context. Resolve a named public holiday (Labor Day, Memorial Day, Thanksgiving, July 4th, etc.) to its real calendar date in the grounded year — do not fall back to the received date just because the holiday name is the only date reference. Null if no date is determinable."),
   time: z
     .string()
     .nullable()
@@ -123,7 +123,7 @@ Choose a "kind" per item:
 
 When a "wear X" / "bring X" note could be either: if it points at one dated event → reminder; if it is a standing rule for something recurring → advisory.
 
-Only extract items with a concrete, determinable date. Skip vague mentions with no date. (An advisory still needs the date it starts applying — usually the email's own date or the first affected day.) The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. Never invent a year that isn't grounded in the received date or explicit text. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
+Only extract items with a concrete, determinable date. Skip vague mentions with no date. (An advisory still needs the date it starts applying — usually the email's own date or the first affected day.) The email's "Received" date (given above the body) is your anchor for resolving relative or year-ambiguous dates — "next Friday" means the Friday after that received date; "through August 5" or "March 12" with no year means the nearest such date on or after the received date, not a year from your own training data. A named public holiday ("Labor Day", "Memorial Day", "Thanksgiving", "the 4th of July", "Presidents' Day", etc.) resolves to that holiday's ACTUAL calendar date in the year grounded by the received date — e.g. an email received in early September 2026 that says "Labor Day Kickoff Party" with no explicit date is on Monday September 7, 2026 (the first Monday of September), NOT on the received date. Do not fall back to the received date just because a holiday name is the only date reference. Never invent a year that isn't grounded in the received date or explicit text. If a date genuinely can't be resolved even with that anchor, leave it null rather than guessing.
 
 Put stated facts in their structured fields, not in notes: an end time goes in end_time, a place in location, a "report by"/"doors open"/"call time" in arrival_time, and classify the activity into category. Do NOT compute a default arrival time — only fill arrival_time when the text explicitly states one.
 

@@ -66,6 +66,42 @@ function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail
  * is deadline-style (date optional). */
 const SCHEDULE_KINDS: EntryKind[] = ["event", "advisory", "reminder"];
 
+const TITLE_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "of", "for", "to", "at", "on", "in", "with",
+  "your", "our", "day", "night", "party", "event", "bring", "wear",
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length > 2 && !TITLE_STOPWORDS.has(t))
+  );
+}
+
+/** A reminder rides along as a sub-line of ONE dated event from the same
+ * email. Pick that parent: the sole event if there's exactly one, else the
+ * best title-token overlap among this message's events (falling back to
+ * tasks). No confident match with multiple candidates → leave it standalone
+ * rather than nest it under the wrong entry. */
+export function pickReminderParent(
+  reminder: Pick<ExtractedItem, "title">,
+  candidates: { id: string; title: string }[]
+): string | null {
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0].id;
+
+  const wanted = titleTokens(reminder.title);
+  let best: { id: string; score: number } | null = null;
+  for (const c of candidates) {
+    let score = 0;
+    for (const tok of titleTokens(c.title)) if (wanted.has(tok)) score++;
+    if (!best || score > best.score) best = { id: c.id, score };
+  }
+  return best && best.score > 0 ? best.id : null;
+}
+
 export async function writeExtractedItems(
   items: ExtractedItem[],
   meta: MessageMeta,
@@ -78,7 +114,11 @@ export async function writeExtractedItems(
   let eventsCreated = 0;
   let todosCreated = 0;
 
-  for (const item of items) {
+  /** Inserts one extracted item; returns its new row id (null if skipped). */
+  const insertItem = async (
+    item: ExtractedItem,
+    linkedEntryId: string | null
+  ): Promise<string | null> => {
     const subjectId = resolvePerson(item.person_hint, domainMemberId, familyMembers);
     const subject = familyMembers.find((m) => m.id === subjectId);
     const sourceDetail = buildSourceDetail(item, meta);
@@ -88,7 +128,7 @@ export async function writeExtractedItems(
     const subjectMemberId = kind === "advisory" ? null : subjectId;
     const onSchedule = SCHEDULE_KINDS.includes(kind);
 
-    if (onSchedule && !item.date) continue; // no date → not useful on the calendar
+    if (onSchedule && !item.date) return null; // no date → not useful on the calendar
 
     const startsAt = onSchedule && item.date ? householdLocalToInstant(item.date, item.time) : null;
     const endsAt =
@@ -133,6 +173,7 @@ export async function writeExtractedItems(
         notes: item.notes,
         arrival_at: arrivalAt,
         arrival_source: arrivalSource,
+        linked_entry_id: kind === "reminder" ? linkedEntryId : null,
         busy_status: kind === "event" ? "busy" : "free",
         is_critical: item.is_critical ?? false,
         scope: subject?.isAdult ? "personal" : "family",
@@ -154,6 +195,24 @@ export async function writeExtractedItems(
 
     if (kind === "task") todosCreated++;
     else eventsCreated++;
+    return data?.id ?? null;
+  };
+
+  // Insert non-reminders first so a reminder can be linked to its sibling
+  // event/task from the same email (write.ts previously never set
+  // linked_entry_id, so every auto-detected reminder rendered standalone).
+  const parents: { id: string; title: string; kind: EntryKind }[] = [];
+  for (const item of items) {
+    if (item.kind === "reminder") continue;
+    const id = await insertItem(item, null);
+    if (id) parents.push({ id, title: item.title, kind: item.kind });
+  }
+
+  const eventParents = parents.filter((p) => p.kind === "event");
+  const parentPool = eventParents.length ? eventParents : parents.filter((p) => p.kind === "task");
+  for (const item of items) {
+    if (item.kind !== "reminder") continue;
+    await insertItem(item, pickReminderParent(item, parentPool));
   }
 
   return { eventsCreated, todosCreated };
