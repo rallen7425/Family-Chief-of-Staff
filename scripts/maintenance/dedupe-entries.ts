@@ -29,6 +29,15 @@ import type { SourceDetail } from "../../lib/types";
 
 const APPLY = process.argv.includes("--apply");
 const FUZZY = process.argv.includes("--fuzzy");
+/** --skip=<id>,<id> — loser ids to leave alone (a proposed merge that is
+ * actually two distinct things). A plan whose every loser is skipped is
+ * dropped entirely. */
+const SKIP = new Set(
+  (process.argv.find((a) => a.startsWith("--skip="))?.slice("--skip=".length) ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 
 const SELECT =
   "id,kind,title,starts_at,ends_at,due_at,is_all_day,location_text,notes,category,subject_member_id,arrival_at,arrival_source,status,source_detail,created_at";
@@ -177,9 +186,23 @@ async function main() {
     .returns<Row[]>();
   if (error) throw error;
 
-  const plans = planExact(data);
-  const dropped = new Set(plans.flatMap((p) => p.drop.map((r) => r.id)));
-  if (FUZZY) plans.push(...(await planFuzzy(data, dropped)));
+  const planned = planExact(data);
+  const dropped = new Set(planned.flatMap((p) => p.drop.map((r) => r.id)));
+  if (FUZZY) planned.push(...(await planFuzzy(data, dropped)));
+
+  // Honour --skip: drop skipped losers, recompute each keeper's merge patch
+  // from only the surviving losers, and drop any plan left with none.
+  const plans = planned
+    .map((p) => {
+      const drop = p.drop.filter((r) => !SKIP.has(r.id));
+      return { ...p, drop, patch: drop.length ? mergeAll(p.keep, drop) : null };
+    })
+    .filter((p) => p.drop.length > 0);
+  const skippedCount = planned.reduce(
+    (n, p) => n + p.drop.filter((r) => SKIP.has(r.id)).length,
+    0
+  );
+  if (skippedCount) console.log(`Skipping ${skippedCount} loser(s) via --skip.\n`);
 
   if (plans.length === 0) {
     console.log("No duplicates found.");
