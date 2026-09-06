@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractSenderDomain, resolveByDomain, resolvePerson } from "./write";
+import { extractSenderDomain, pickReminderParent, resolveByDomain, resolvePerson } from "./write";
 import type { FamilyMember } from "@/lib/types";
 import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 
@@ -61,5 +61,37 @@ describe("resolvePerson", () => {
 
   it("returns null when there is neither a usable hint nor a domain match", () => {
     expect(resolvePerson(null, null, family)).toBeNull();
+  });
+});
+
+describe("pickReminderParent", () => {
+  it("returns null when the email produced no event/task to hang off", () => {
+    expect(pickReminderParent({ title: "Bring a towel" }, [])).toBeNull();
+  });
+
+  it("links to the sole candidate without needing a title match", () => {
+    expect(
+      pickReminderParent({ title: "Bring bathing suit and towel to Kickoff Party" }, [
+        { id: "party", title: "Labor Day Kickoff Party" },
+      ])
+    ).toBe("party");
+  });
+
+  it("picks the best title-token overlap when there are several candidates", () => {
+    expect(
+      pickReminderParent({ title: "Wear chapel dress for Picture Day" }, [
+        { id: "game", title: "Soccer game vs. Andover" },
+        { id: "pics", title: "School Picture Day" },
+      ])
+    ).toBe("pics");
+  });
+
+  it("stays standalone when nothing overlaps and the parent is ambiguous", () => {
+    expect(
+      pickReminderParent({ title: "Bring a water bottle" }, [
+        { id: "a", title: "Soccer game vs. Andover" },
+        { id: "b", title: "Orchestra rehearsal" },
+      ])
+    ).toBeNull();
   });
 });
