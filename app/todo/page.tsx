@@ -1,6 +1,7 @@
 import { getTodos } from "@/lib/data/todos";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { PersonFilter } from "@/components/shared/PersonFilter";
 import { TodoList } from "@/components/todos/TodoList";
 import { AddEntryDialog } from "@/components/entries/AddEntryDialog";
@@ -11,10 +12,11 @@ export default async function TodoPage(props: PageProps<"/todo">) {
   const searchParams = await props.searchParams;
   const person = typeof searchParams.person === "string" ? searchParams.person : "all";
 
-  const [todos, familyMembers, arrivalRules] = await Promise.all([
+  const [todos, familyMembers, arrivalRules, activitiesByMember] = await Promise.all([
     getTodos(person),
     getFamilyMembers(),
     getArrivalBufferRules(),
+    getActivitiesByMember(),
   ]);
 
   return (
@@ -24,6 +26,7 @@ export default async function TodoPage(props: PageProps<"/todo">) {
         <AddEntryDialog
           familyMembers={familyMembers}
           arrivalRules={arrivalRules}
+          activitiesByMember={activitiesByMember}
           defaultKind="task"
           label="Add task"
         />

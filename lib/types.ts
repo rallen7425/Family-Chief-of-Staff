@@ -62,6 +62,11 @@ export interface MemberDetail {
   /** Soft-hidden from downstream logic, still shown (struck through). */
   ignored: boolean;
   source: "manual" | "detected" | "voice";
+  /** "Arrive N minutes early" for entries bound to this activity. Null =
+   * fall back to the category rule / general default. 0–180. */
+  arrivalBufferMinutes?: number | null;
+  /** game | practice | rehearsal | appointment | other. */
+  category?: string | null;
 }
 
 export interface SourceDetail {
@@ -128,6 +133,9 @@ export interface CalendarEvent {
   recurrenceUntil?: string; // YYYY-MM-DD
   /** Set on a reminder: the event/task it's attached to. Null = standalone. */
   linkedEntryId?: string | null;
+  /** The subject member's activity (member_details row) this entry belongs
+   * to — drives the per-activity arrival buffer. Null = none. */
+  memberDetailId?: string | null;
   /** Reminders linked to this entry, attached for schedule rendering. */
   reminders?: CalendarEvent[];
   createdAt: string; // ISO datetime
@@ -169,6 +177,7 @@ export interface EntryInput {
   arrivalAt?: string | null;
   arrivalSource?: ArrivalSource | null;
   linkedEntryId?: string | null;
+  memberDetailId?: string | null;
   recurrence?: {
     localDate: string;
     localStartTime?: string;

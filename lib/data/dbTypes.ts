@@ -27,6 +27,12 @@ export interface MemberDetailRow {
   fields: { label: string; value: string }[];
   ignored: boolean;
   source: "manual" | "detected" | "voice";
+  /** Per-activity arrival buffer (minutes). Null = no activity-specific
+   * buffer; arrival inference falls back to the category rule. */
+  arrival_buffer_minutes: number | null;
+  /** game | practice | rehearsal | appointment | other — lets an activity's
+   * buffer also serve as the category-rule fallback for matching entries. */
+  category: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +60,9 @@ export interface EntryRow {
   recurrence_id: string | null;
   recurrence_until: string | null; // YYYY-MM-DD
   linked_entry_id: string | null;
+  /** The subject member's activity (member_details row) this entry belongs
+   * to, if any — drives the per-activity arrival buffer. */
+  member_detail_id: string | null;
   is_critical: boolean;
   status: ItemStatus;
   completed_at: string | null;

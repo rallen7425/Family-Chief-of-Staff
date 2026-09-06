@@ -9,16 +9,27 @@ import type { FamilyMember } from "@/lib/types";
  */
 export const ACTIVE_MEMBER_COOKIE = "fcos_active_member";
 
+/** Cookie value meaning "signed out" — distinct from "never set" (which
+ * falls back to a default member). The lock screen shows while this is set. */
+export const LOGGED_OUT = "__logged_out__";
+
 export async function getActiveMemberId(): Promise<string | null> {
   const store = await cookies();
   return store.get(ACTIVE_MEMBER_COOKIE)?.value ?? null;
 }
 
+/** True when the user explicitly logged out (device convenience, not auth). */
+export async function isLoggedOut(): Promise<boolean> {
+  return (await getActiveMemberId()) === LOGGED_OUT;
+}
+
 /** The stored member if it still exists, else the first head-of-household,
- * else the first adult, else the first member. Null only for an empty roster. */
+ * else the first adult, else the first member. Null for an empty roster OR
+ * when explicitly logged out. */
 export async function getActiveMember(members: FamilyMember[]): Promise<FamilyMember | null> {
   if (members.length === 0) return null;
   const storedId = await getActiveMemberId();
+  if (storedId === LOGGED_OUT) return null;
   const stored = storedId ? members.find((m) => m.id === storedId) : undefined;
   return (
     stored ??

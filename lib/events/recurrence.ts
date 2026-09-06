@@ -21,6 +21,7 @@ export interface EntryRowInsert {
   arrival_at: string | null;
   arrival_source: "stated" | "inferred" | "manual" | null;
   linked_entry_id: string | null;
+  member_detail_id: string | null;
   recurrence_id: string | null;
   recurrence_until: string | null;
   status: "confirmed" | "pending_review";
@@ -68,6 +69,7 @@ export function buildEntryRows({ input, sourceType, sourceDetail, status = "conf
     category: input.category?.trim() || null,
     is_all_day: input.allDay,
     linked_entry_id: input.linkedEntryId ?? null,
+    member_detail_id: input.kind === "event" ? input.memberDetailId ?? null : null,
     status,
     source_type: sourceType,
     source_detail: sourceDetail ?? null,

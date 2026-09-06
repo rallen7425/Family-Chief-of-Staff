@@ -1,22 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
 import { HeadOfHouseholdDialog } from "@/components/family/HeadOfHouseholdDialog";
 import { EditMemberDialog } from "@/components/family/EditMemberDialog";
 import { initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
-import type { FamilyMember, MemberDetail } from "@/lib/types";
+import type { FamilyMember } from "@/lib/types";
 
-export function ManageFamilyClient({
-  members,
-  detailsByMember,
-}: {
-  members: FamilyMember[];
-  detailsByMember: Record<string, MemberDetail[]>;
-}) {
+export function ManageFamilyClient({ members }: { members: FamilyMember[] }) {
   const [hohOpen, setHohOpen] = useState(false);
-  const [editing, setEditing] = useState<FamilyMember | null>(null);
   const [adding, setAdding] = useState(false);
 
   const hoh = members.filter((m) => m.isHeadOfHousehold);
@@ -74,10 +68,9 @@ export function ManageFamilyClient({
         </div>
         <div className="bg-surface rounded-card overflow-hidden shadow-sm shadow-black/5">
           {members.map((m) => (
-            <button
+            <Link
               key={m.id}
-              type="button"
-              onClick={() => setEditing(m)}
+              href={`/family/${m.id}`}
               className="w-full flex items-center gap-3 p-4 text-left border-b border-[#F1F3F6] last:border-b-0 hover:bg-mist/60 transition-colors"
             >
               <span
@@ -100,7 +93,7 @@ export function ManageFamilyClient({
                 </span>
               </span>
               <ChevronRight size={17} className="text-border shrink-0" />
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -114,18 +107,7 @@ export function ManageFamilyClient({
       </button>
 
       <HeadOfHouseholdDialog open={hohOpen} onClose={() => setHohOpen(false)} members={members} />
-      {editing && (
-        <EditMemberDialog
-          open
-          onClose={() => setEditing(null)}
-          member={editing}
-          allMembers={members}
-          details={detailsByMember[editing.id] ?? []}
-        />
-      )}
-      {adding && (
-        <EditMemberDialog open onClose={() => setAdding(false)} allMembers={members} />
-      )}
+      {adding && <EditMemberDialog open onClose={() => setAdding(false)} allMembers={members} />}
     </>
   );
 }

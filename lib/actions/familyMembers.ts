@@ -4,15 +4,18 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getSupabaseClient } from "@/lib/supabase";
 import { computeIsAdult, effectiveIsAdult } from "@/lib/family";
-import { ACTIVE_MEMBER_COOKIE } from "@/lib/activeMember";
+import { ACTIVE_MEMBER_COOKIE, LOGGED_OUT } from "@/lib/activeMember";
 import type { AccentColor } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function revalidateProfileViews() {
-  for (const p of ["/", "/profile", "/family", "/settings", "/schedule", "/todo"]) {
+  for (const p of ["/", "/settings", "/schedule", "/todo"]) {
     revalidatePath(p);
   }
+  // "layout" so the dynamic /family/[memberId] children refresh too.
+  revalidatePath("/profile", "layout");
+  revalidatePath("/family", "layout");
 }
 
 // ── full create / edit (the Edit Member sheet) ─────────────────────────────
@@ -104,6 +107,9 @@ export interface ProfileFieldPatch {
   relationship?: string;
   email?: string; // "" clears it
   phone?: string; // "" clears it
+  birthday?: string; // YYYY-MM-DD, "" clears it
+  school?: string; // "" clears it
+  grade?: string; // "" clears it
   accentColor?: AccentColor;
 }
 
@@ -131,6 +137,15 @@ export async function updateProfileFields(
     if (v && (digits.length < 7 || digits.length > 15)) return { error: "Enter a valid phone number." };
     row.phone = v || null;
   }
+  if (patch.birthday !== undefined) {
+    const v = patch.birthday.trim();
+    if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { error: "Enter a valid birthday." };
+    row.birthday = v || null;
+    // A birthday is authoritative for the age class (see lib/family.ts).
+    if (v) row.is_adult = computeIsAdult(v);
+  }
+  if (patch.school !== undefined) row.school = patch.school.trim() || null;
+  if (patch.grade !== undefined) row.grade = patch.grade.trim() || null;
   if (patch.accentColor !== undefined) row.accent_color = patch.accentColor;
   if (Object.keys(row).length === 0) return {};
 
@@ -207,6 +222,18 @@ export async function forgetEverything(): Promise<{ error?: string }> {
 export async function setActiveMember(id: string): Promise<void> {
   const store = await cookies();
   store.set(ACTIVE_MEMBER_COOKIE, id, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
+  revalidateProfileViews();
+}
+
+/** "Log out" — pre-auth: parks the device on the lock screen (a member
+ * picker) until someone picks who's using the app. No session to destroy. */
+export async function logOut(): Promise<void> {
+  const store = await cookies();
+  store.set(ACTIVE_MEMBER_COOKIE, LOGGED_OUT, {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",

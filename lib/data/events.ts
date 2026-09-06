@@ -43,6 +43,7 @@ function mapEvent(row: EntryRowWithOwners): CalendarEvent {
     recurrenceId: row.recurrence_id ?? undefined,
     recurrenceUntil: row.recurrence_until ?? undefined,
     linkedEntryId: row.linked_entry_id,
+    memberDetailId: row.member_detail_id,
     createdAt: row.created_at,
   };
 }
