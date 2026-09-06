@@ -15,6 +15,120 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-06) — schedule dedupe / holidays + Profile & Family rework (DEPLOYED)
+
+Three real-usage bug reports; the third grew into a feature rework. **All merged
+to `main` and deployed** — `dpl_5zBWvQK9h3zymePRtcfHtnRrTwok` (READY, aliased
+`family-chief-of-staff.vercel.app`). `main` @ `7ed5a77`. PRs #1–4 squash-merged in
+order (#1 was the pre-existing `menu-and-review-ux`; #2–4 this session). `tsc` /
+eslint / **155 tests** / `vercel` build green. Live smoke: all routes 200 incl.
+`/settings/switch`, `/profile/details`, `/family/[id]`.
+
+### Bug 1 — holiday-date resolution + reminder linking (PR #2, `8226061`)
+
+- **"Labor Day Kickoff Party"** (+ its bathing-suit reminder) landed on the email's
+  received date (Sun Sep 6) instead of Labor Day itself (Mon Sep 7) — the email
+  only ever says "LABOR DAY KICKOFF PARTY", no explicit date. `extractEvents.ts`
+  now tells the model to resolve a named US holiday to its real calendar date and
+  not fall back to the received date when that's the only cue.
+- **`write.ts` never set `entries.linked_entry_id`** — every auto-detected `reminder`
+  rendered standalone instead of nesting under its event. Fixed: insert
+  non-reminders first, then link each reminder to its sibling (sole event/task, or
+  best title-token overlap, else standalone). New `pickReminderParent` + tests.
+- The two mis-dated live rows were corrected directly.
+
+### Bug 2 — cross-email dedupe + holiday/no-school + all-day arrival guard (PR #3, `da621ee`)
+
+Sep 7 had 6 events + 1 reminder for **3 real things** (the football party ×2 emails,
+"Labor Day Practice" flagged all-day though the notes said "arrive 9am, done by
+noon", and Austin Prep's closure as 3 near-identical rows, 2 with a nonsense
+inferred "arrive 11:45 PM the night before").
+
+- **`extractEvents.ts`:** a "no school / campus closed / office closed / holiday /
+  PD day / snow day" notice → **`advisory`** (household-wide, no owner, no arrival),
+  never an event/task. Prompt carries the 11 US federal holidays. + if the only
+  clock times are a report/arrival time and/or an end time, use the report time as
+  the start (not all-day).
+- **`write.ts`:** infer/attach an arrival only for **timed** events — never on
+  all-day. Plus **cross-email dedupe before insert** (new `scripts/pipeline/dedupe.ts`):
+  pull existing non-dismissed entries ±1 day of a compatible kind → structural
+  check (local day + kind family + title-token overlap) → one small LLM call for
+  near-misses (catches "Team #120 Football Kickoff Party" ≡ "Labor Day Kickoff
+  Party"). On a match, **merge** the new email's detail into the surviving row
+  (fill blanks, upgrade all-day→timed, record it in `source_detail.mergedSources`)
+  and skip the insert. `event`↔`advisory` only cross-match for an all-day closure,
+  so a "practice ending early" advisory won't collapse into the practice.
+- **`lib/usHolidays.ts`** — the 11 US federal holidays by rule (+ tests).
+- **`scripts/maintenance/dedupe-entries.ts`** — merges loser detail into the keeper
+  before dismissing; new `--fuzzy` (token-overlap + LLM sweep) and `--skip=<id,id>`.
+- **Live data:** Sep 7 rows hand-fixed (party consolidated to the timed noon row,
+  practice → 9 AM–12 PM, 3 closures → one "No school — Labor Day" advisory). Then
+  ran `--fuzzy --apply --skip=<6 ids>`: **18 historical duplicate sets consolidated**
+  across the DB (Convocation, Picture Day, First day of classes, Scrimmage ×2,
+  cheer/medical/immunization dups, …); 6 proposals skipped as actually-distinct
+  (retreat canoeing sub-trip & pickup, two team meals, "Claude 101 INTL Day -1",
+  "First Day of School for NEW/9th Grade"). All reversible via `status`.
+
+### Bug 3 — Profile & Family rework (PR #4, `7ed5a77`)
+
+My Profile and the Manage Family member view are now the **same screen**
+(`components/profile/MemberProfileFields.tsx`) with only the required differences.
+Migration `rocky-coast-labs/.../20260906000001_family_chief_of_staff_activity_arrival.sql`
+— **applied to the shared DB** (verified; the `rocky-coast-labs` repo commit was
+handed to the user).
+
+- **Auth stepping-stones** (pre-real-auth, on the `fcos_active_member` cookie):
+  `lib/activeMember.ts` gets a `LOGGED_OUT` sentinel distinct from "never set".
+  **Settings → Switch Account** (`/settings/switch`) + **Log out** → a **lock
+  screen** (`components/auth/LockScreen.tsx` + `MemberPicker.tsx`) rendered in
+  `app/layout.tsx` in place of the whole app until a profile is picked.
+  **"Manage Family" is Head-of-Household-only** — the Settings row, the My Profile
+  text link, and `/family` + `/family/[memberId]` (non-HoH → their own My Profile).
+  Real role checks land with the auth workstream.
+- **My Profile** (`app/profile/page.tsx` + `MyProfileClient.tsx`): "Switch profile"
+  pills **removed** (no viewing other members' My Profile); "Manage Family" is a
+  text link under the avatar tile (HoH only); "Forget my info" moved to the bottom;
+  **birthday** shown (read-only here, edited from Manage Family).
+- **"Additional Context and Details"** (renamed from "Activities, teams, & additional
+  details"): new `components/profile/AdditionalContextDetails.tsx` — an inline
+  **collapsible** panel (collapsed by default, like event history), scrollable,
+  edit/ignore/remove/add, **"View all →"** → `/profile/details` or
+  `/family/[memberId]/details`. For **every** member. Old `MemberDetailsDialog`
+  modal **deleted**.
+- **Manage Family**: member rows link to **`/family/[memberId]`** (mirrors My
+  Profile, `ManageMemberClient.tsx`) instead of a modal; `EditMemberDialog` is now
+  **Add-only**. One "Forget {name}'s info" link (`ForgetDialog` `defaultMemberId`);
+  "Remove from family" stays separate. Email/phone use the same `InlineEditField`
+  behaviour as My Profile, for all members. `updateProfileFields` extended with
+  birthday/school/grade (birthday recomputes `is_adult`).
+- **Per-activity arrival buffers**: `member_details` gains `arrival_buffer_minutes`
+  + `category`; `entries` gains `member_detail_id` (nullable FK, `ON DELETE SET
+  NULL`). Each activity row can carry its own "arrive N min early" + category.
+  `EntryForm` gets an **"Activity"** picker (the subject member's activities);
+  binding one stores `entries.member_detail_id` and its buffer **wins over the
+  household category rules — for any subject, adults included**. `lib/arrival.ts`:
+  `resolveArrivalBuffer` (activity → category rule → general default) +
+  `describeActivityArrival`. Threaded through `EntryEditingContext` → schedule /
+  today / review / todo. `lib/data/memberDetails.ts` `getActivitiesByMember()`
+  (`cache()`d). Email-scan (`write.ts`) and chat keep the category-rule fallback —
+  auto-matching an entry to an activity by name is a follow-up.
+
+### Not done / follow-ups
+
+- `rocky-coast-labs` migration file — applied to the DB; the repo commit + push was
+  handed to the user (not done in-session).
+- Not click-through-verified on a real device: the Activity picker persisting
+  `member_detail_id`, the per-activity buffer editor round-trip, and the Log out →
+  lock screen → Switch Account flow (only cookie/curl-verified).
+- Pipeline / chat can't yet bind an entry to an activity (auto-match by name is the
+  deferred piece).
+- `--fuzzy` dedupe of the whole DB is an O(n) LLM sweep — fine as a manual one-off,
+  not something to run on a cron.
+- Per-member HoH toggle isn't on `/family/[memberId]` — HoH assignment stays in the
+  existing `HeadOfHouseholdDialog` on `/family`.
+
+---
+
 ## Session status (2026-09-01) — pending-review actions + advisory/Today fixes (DEPLOYED)
 
 Batch of fixes from real-usage feedback. **`main` @ `9022dab` pushed; deployed to
