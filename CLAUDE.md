@@ -15,14 +15,36 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-09-06) — schedule dedupe / holidays + Profile & Family rework (DEPLOYED)
+## Session status (2026-09-06) — schedule dedupe / holidays + Profile & Family rework (DEPLOYED — paused for on-device verification)
 
 Three real-usage bug reports; the third grew into a feature rework. **All merged
-to `main` and deployed** — `dpl_5zBWvQK9h3zymePRtcfHtnRrTwok` (READY, aliased
-`family-chief-of-staff.vercel.app`). `main` @ `7ed5a77`. PRs #1–4 squash-merged in
-order (#1 was the pre-existing `menu-and-review-ux`; #2–4 this session). `tsc` /
-eslint / **155 tests** / `vercel` build green. Live smoke: all routes 200 incl.
-`/settings/switch`, `/profile/details`, `/family/[id]`.
+to `main` and deployed.** Session then **paused pending an on-device click-through**
+of the new profile / activity / lock-screen flows (see "RESUME HERE" below).
+
+| | |
+|---|---|
+| **Production** | `dpl_G3DdEbdqnTfnRAMeiJx1XCMqpLCM` (READY, aliased `family-chief-of-staff.vercel.app`) — two deploys this session (`dpl_5zBWv…` then this one after PR #5). |
+| **`family-chief-of-staff`** | `main` @ `267fda3`. PRs **#1–#5** squash-merged in order (#1 = the pre-existing `menu-and-review-ux`; #2–#5 this session). All feature branches deleted. |
+| **`rocky-coast-labs`** | `main` @ `eea4db5` — migration `20260906000001_family_chief_of_staff_activity_arrival.sql` committed **and** applied to the shared DB (verified: `member_details.arrival_buffer_minutes` / `.category`, `entries.member_detail_id` all present). |
+| **Checks** | `tsc` / eslint / **155 tests** / `vercel` build green. Live smoke: every route 200 incl. `/settings/switch`, `/profile/details`, `/family/[id]`, `/settings/arrival`. |
+
+### RESUME HERE — pending on-device verification (nothing else outstanding)
+
+Only cookie/curl-verified so far; needs a real device against
+`family-chief-of-staff.vercel.app`:
+
+1. **Activity picker** on a new/edited event actually persists `entries.member_detail_id`,
+   and its buffer shows in the arrival badge + overrides the category rule.
+2. **Per-activity buffer editor** in "Additional Context and Details" round-trips
+   (set category + "arrive N min early", reload, still there).
+3. **`/family/[memberId]`** inline edits save — especially birthday (should recompute
+   the Adult/Child label) and school/grade.
+4. **Log out → lock screen → pick a profile → back in**, and **Settings → Switch
+   Account**. Also confirm a non-HoH member (Ben/Nora) gets sent to their own My
+   Profile from `/family` and `/settings` hides the Manage Family / Connected
+   Accounts rows for them.
+
+If all four pass, this session's work is fully closed.
 
 ### Bug 1 — holiday-date resolution + reminder linking (PR #2, `8226061`)
 
@@ -69,13 +91,12 @@ inferred "arrive 11:45 PM the night before").
   (retreat canoeing sub-trip & pickup, two team meals, "Claude 101 INTL Day -1",
   "First Day of School for NEW/9th Grade"). All reversible via `status`.
 
-### Bug 3 — Profile & Family rework (PR #4, `7ed5a77`)
+### Bug 3 — Profile & Family rework (PR #4 `7ed5a77` + PR #5 `267fda3`)
 
 My Profile and the Manage Family member view are now the **same screen**
 (`components/profile/MemberProfileFields.tsx`) with only the required differences.
 Migration `rocky-coast-labs/.../20260906000001_family_chief_of_staff_activity_arrival.sql`
-— **applied to the shared DB** (verified; the `rocky-coast-labs` repo commit was
-handed to the user).
+— applied to the shared DB **and** committed (`rocky-coast-labs` @ `eea4db5`).
 
 - **Auth stepping-stones** (pre-real-auth, on the `fcos_active_member` cookie):
   `lib/activeMember.ts` gets a `LOGGED_OUT` sentinel distinct from "never set".
@@ -113,19 +134,36 @@ handed to the user).
   (`cache()`d). Email-scan (`write.ts`) and chat keep the category-rule fallback —
   auto-matching an entry to an activity by name is a follow-up.
 
-### Not done / follow-ups
+### PR #5 — restore nav to the arrival-buffer defaults page (`267fda3`)
 
-- `rocky-coast-labs` migration file — applied to the DB; the repo commit + push was
-  handed to the user (not done in-session).
-- Not click-through-verified on a real device: the Activity picker persisting
-  `member_detail_id`, the per-activity buffer editor round-trip, and the Log out →
-  lock screen → Switch Account flow (only cookie/curl-verified).
-- Pipeline / chat can't yet bind an entry to an activity (auto-match by name is the
-  deferred piece).
-- `--fuzzy` dedupe of the whole DB is an O(n) LLM sweep — fine as a manual one-off,
-  not something to run on a cron.
-- Per-member HoH toggle isn't on `/family/[memberId]` — HoH assignment stays in the
-  existing `HeadOfHouseholdDialog` on `/family`.
+Deleting `MemberDetailsDialog` in PR #4 left `/settings/arrival` (the household
+category-fallback rules: game 60m / general 15m) reachable only by typing the URL —
+PR #1 had moved its only link into that dialog. Fix: an **"Arrival buffer defaults"**
+row back at the bottom of Manage Family (`/family`, already HoH-gated), page
+re-titled to match, intro reworded to note a bound activity's buffer takes
+precedence. No logic change.
+
+### Deferred by design (documented, not open bugs)
+
+- **Pipeline + chat can't bind an entry to an activity** — auto-matching by team /
+  activity name is the follow-up; both still use the category-rule fallback.
+- **Per-member HoH toggle** isn't on `/family/[memberId]` — assignment stays in
+  `HeadOfHouseholdDialog` on `/family`.
+- **Bug 1's prompt fix is future-scans-only** — no other already-scanned holiday
+  emails were reprocessed (none are current-dated, so low impact).
+- **`--fuzzy` DB dedupe** is an O(n) LLM sweep — manual one-off only, never a cron.
+- **`EditMemberDialog` (Add form)** still branches email/phone vs school/grade on
+  the birthday-derived `isAdult` — adding a kid with a birthday hides email/phone
+  (addable later on their `/family/[id]` page). Minor, left as-is.
+
+### Pre-existing, untouched this session
+
+- `/api/chat` is still an open public endpoint (auth workstream).
+- GCP OAuth consent screen still "Testing" → the Gmail refresh token expires ~7 days
+  after the 2026-08-30 re-auth, i.e. **around 2026-09-06**. If the scan cron goes
+  quiet, re-run `scripts/gmail/get-refresh-token.ts`. Publishing the consent screen
+  (console → APIs & Services → OAuth consent screen → Publish app) is the real fix,
+  still deferred.
 
 ---
 
