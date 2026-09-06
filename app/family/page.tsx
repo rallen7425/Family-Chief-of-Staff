@@ -1,22 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getActiveMember } from "@/lib/activeMember";
 import { getHomeLocation } from "@/lib/data/locations";
-import { getMemberDetails } from "@/lib/data/memberDetails";
 import { HomeLocationCard } from "@/components/family/HomeLocationCard";
 import { ManageFamilyClient } from "@/components/family/ManageFamilyClient";
-import type { MemberDetail } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function ManageFamilyPage() {
   const [familyMembers, home] = await Promise.all([getFamilyMembers(), getHomeLocation()]);
-  const detailsByMember: Record<string, MemberDetail[]> = {};
-  await Promise.all(
-    familyMembers.map(async (m) => {
-      detailsByMember[m.id] = await getMemberDetails(m.id);
-    })
-  );
+  // HoH-gated (a UI convenience — no auth). Others only see their own profile.
+  const activeMember = await getActiveMember(familyMembers);
+  if (!activeMember?.isHeadOfHousehold) redirect("/profile");
 
   return (
     <>
@@ -29,7 +26,7 @@ export default async function ManageFamilyPage() {
 
       <HomeLocationCard address={home?.address ?? null} />
 
-      <ManageFamilyClient members={familyMembers} detailsByMember={detailsByMember} />
+      <ManageFamilyClient members={familyMembers} />
     </>
   );
 }

@@ -5,6 +5,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { buildEntryRows } from "@/lib/events/recurrence";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getMemberDetails } from "@/lib/data/memberDetails";
 import { inferArrivalAt } from "@/lib/arrival";
 import type { EntryInput, EntryKind, SourceDetail, SourceType } from "@/lib/types";
 
@@ -33,13 +34,25 @@ async function resolveArrival(input: EntryInput): Promise<EntryInput> {
   if (input.arrivalSource || input.arrivalAt || input.kind !== "event") return input;
   const [members, rules] = await Promise.all([getFamilyMembers(), getArrivalBufferRules()]);
   const subject = members.find((m) => m.id === input.subjectMemberId);
+
+  // A bound activity's own buffer wins over the category rules.
+  let activityBufferMinutes: number | null = null;
+  let activityCategory: string | null = null;
+  if (input.memberDetailId && input.subjectMemberId) {
+    const details = await getMemberDetails(input.subjectMemberId);
+    const activity = details.find((d) => d.id === input.memberDetailId);
+    activityBufferMinutes = activity?.arrivalBufferMinutes ?? null;
+    activityCategory = activity?.category ?? null;
+  }
+
   const arrivalAt = inferArrivalAt(
     {
       kind: input.kind,
       startsAt: input.startsAt,
-      category: input.category,
+      category: input.category ?? activityCategory,
       subjectMemberId: input.subjectMemberId,
       subjectIsAdult: subject?.isAdult ?? false,
+      activityBufferMinutes,
     },
     rules
   );
@@ -115,6 +128,7 @@ export async function updateEntry(id: string, rawInput: EntryInput): Promise<{ e
       arrival_at: input.arrivalAt ?? null,
       arrival_source: input.arrivalSource ?? null,
       linked_entry_id: input.linkedEntryId ?? null,
+      member_detail_id: input.kind === "event" ? input.memberDetailId ?? null : null,
       // status is owned by the review flow, not field edits.
       updated_at: new Date().toISOString(),
     })
@@ -192,6 +206,9 @@ export async function reclassifyEntry(id: string, kind: EntryKind): Promise<{ er
   if (readErr) return { error: readErr.message };
 
   const patch: Record<string, unknown> = { kind, updated_at: new Date().toISOString() };
+
+  // Only an event carries an activity link.
+  if (kind !== "event") patch.member_detail_id = null;
 
   if (kind === "task") {
     // Tasks live on a due date, never a datetime.

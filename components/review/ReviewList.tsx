@@ -6,7 +6,7 @@ import { approveReviewItems, removeReviewItems, type ReviewItemRef } from "@/lib
 import { EntryDetailsModal } from "@/components/entries/EntryDetailsModal";
 import type { LinkableEntry } from "@/components/entries/EntryForm";
 import type { ArrivalBufferRule } from "@/lib/arrival";
-import type { CalendarEvent, EntryKind, FamilyMember } from "@/lib/types";
+import type { CalendarEvent, EntryKind, FamilyMember, MemberDetail } from "@/lib/types";
 
 export interface ReviewGroupItem {
   id: string;
@@ -46,11 +46,13 @@ export function ReviewList({
   familyMembers,
   arrivalRules,
   linkables = [],
+  activitiesByMember = {},
 }: {
   groups: ReviewGroup[];
   familyMembers: FamilyMember[];
   arrivalRules: ArrivalBufferRule[];
   linkables?: LinkableEntry[];
+  activitiesByMember?: Record<string, MemberDetail[]>;
 }) {
   const allKeys = groups.flatMap((group) => group.items.map(itemKey));
   const [selected, setSelected] = useState<Set<string>>(new Set(allKeys));
@@ -179,6 +181,7 @@ export function ReviewList({
           familyMembers={familyMembers}
           arrivalRules={arrivalRules}
           linkables={linkables}
+          activitiesByMember={activitiesByMember}
           open={true}
           onClose={() => setEditingItem(null)}
           startInEditMode

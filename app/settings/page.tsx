@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { User, Users, Mail, Settings } from "lucide-react";
+import { User, Users, Mail, Settings, Repeat } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getActiveMember } from "@/lib/activeMember";
 import { SettingsRowContent, settingsRowClass } from "@/components/settings/SettingsRow";
+import { LogOutRow } from "@/components/settings/LogOutRow";
 import { PrivacyRow } from "@/components/settings/PrivacyRow";
 
 export const dynamic = "force-dynamic";
@@ -27,15 +28,17 @@ export default async function SettingsPage() {
           />
         </Link>
 
-        <Link href="/family" className={settingsRowClass}>
-          <SettingsRowContent
-            icon={Users}
-            iconBg="#F3EEF9"
-            iconColor="#7C5CBF"
-            label="Manage Family"
-            sub="Home location, members, roles, arrival defaults"
-          />
-        </Link>
+        {isHoH && (
+          <Link href="/family" className={settingsRowClass}>
+            <SettingsRowContent
+              icon={Users}
+              iconBg="#F3EEF9"
+              iconColor="#7C5CBF"
+              label="Manage Family"
+              sub="Home location, members, roles, arrival defaults"
+            />
+          </Link>
+        )}
 
         {isHoH && (
           <Link href="/settings/accounts" className={settingsRowClass}>
@@ -60,6 +63,19 @@ export default async function SettingsPage() {
         </Link>
 
         <PrivacyRow members={familyMembers} />
+      </div>
+
+      <div className="bg-surface rounded-card overflow-hidden shadow-sm shadow-black/5">
+        <Link href="/settings/switch" className={settingsRowClass}>
+          <SettingsRowContent
+            icon={Repeat}
+            iconBg="#EEF2FB"
+            iconColor="#3B6FE5"
+            label="Switch Account"
+            sub={activeMember ? `Currently ${activeMember.name}` : "Choose a profile"}
+          />
+        </Link>
+        <LogOutRow />
       </div>
     </>
   );

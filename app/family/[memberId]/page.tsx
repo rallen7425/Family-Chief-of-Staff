@@ -1,36 +1,34 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { notFound, redirect } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getActiveMember } from "@/lib/activeMember";
 import { getMemberDetails } from "@/lib/data/memberDetails";
 import { initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
-import { MyProfileClient } from "@/components/profile/MyProfileClient";
+import { ManageMemberClient } from "@/components/family/ManageMemberClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyProfilePage() {
+export default async function FamilyMemberPage(props: PageProps<"/family/[memberId]">) {
+  const { memberId } = await props.params;
   const familyMembers = await getFamilyMembers();
-  const member = await getActiveMember(familyMembers);
+  const activeMember = await getActiveMember(familyMembers);
+  if (!activeMember?.isHeadOfHousehold) redirect("/profile");
 
-  if (!member) {
-    return (
-      <>
-        <h1 className="font-display font-semibold text-[24px] leading-tight text-ink">My Profile</h1>
-        <p className="text-[14px] text-muted-label">No family members yet.</p>
-      </>
-    );
-  }
-
+  const member = familyMembers.find((m) => m.id === memberId);
+  if (!member) notFound();
   const details = await getMemberDetails(member.id);
 
   return (
     <>
       <div className="flex items-center gap-2.5">
-        <Link href="/settings" aria-label="Back" className="text-ink hover:text-primary transition-colors">
+        <Link href="/family" aria-label="Back" className="text-ink hover:text-primary transition-colors">
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-display font-semibold text-[24px] leading-tight text-ink">My Profile</h1>
+        <h1 className="font-display font-semibold text-[24px] leading-tight text-ink">
+          {member.name}
+        </h1>
       </div>
 
       <div className="bg-surface rounded-card p-6 flex flex-col items-center gap-3 shadow-sm shadow-black/5">
@@ -47,17 +45,7 @@ export default async function MyProfilePage() {
         )}
       </div>
 
-      {member.isHeadOfHousehold && (
-        <Link
-          href="/family"
-          className="-mt-2 inline-flex items-center gap-1 self-start text-[13.5px] font-semibold text-primary"
-        >
-          Manage Family
-          <ChevronRight size={15} />
-        </Link>
-      )}
-
-      <MyProfileClient member={member} members={familyMembers} details={details} />
+      <ManageMemberClient member={member} allMembers={familyMembers} details={details} />
     </>
   );
 }

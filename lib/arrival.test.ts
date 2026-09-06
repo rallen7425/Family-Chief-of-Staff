@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { inferArrivalAt, matchArrivalRule, describeArrivalRule, type ArrivalBufferRule } from "@/lib/arrival";
+import {
+  inferArrivalAt,
+  matchArrivalRule,
+  resolveArrivalBuffer,
+  describeArrivalRule,
+  describeActivityArrival,
+  type ArrivalBufferRule,
+} from "@/lib/arrival";
 
 const rules: ArrivalBufferRule[] = [
   { id: "gen", category: null, appliesToKidsOnly: true, bufferMinutes: 15 },
@@ -56,5 +63,42 @@ describe("describeArrivalRule", () => {
   });
   it("names the general default", () => {
     expect(describeArrivalRule(rules[0])).toBe("Auto · 15 min early (kids' activity default)");
+  });
+});
+
+describe("resolveArrivalBuffer — per-activity buffer", () => {
+  it("a bound activity's buffer wins over the category rule", () => {
+    const r = resolveArrivalBuffer(
+      { ...kidEvent, category: "game", activityBufferMinutes: 25 },
+      rules
+    );
+    expect(r).toEqual({ minutes: 25, source: "activity" });
+  });
+
+  it("an activity buffer applies even for an adult subject (rules wouldn't)", () => {
+    const r = resolveArrivalBuffer(
+      { ...kidEvent, subjectIsAdult: true, activityBufferMinutes: 30 },
+      rules
+    );
+    expect(r).toEqual({ minutes: 30, source: "activity" });
+  });
+
+  it("falls back to the rule when there's no activity buffer", () => {
+    expect(resolveArrivalBuffer({ ...kidEvent, category: "game" }, rules)).toEqual({
+      minutes: 60,
+      source: "rule",
+    });
+  });
+
+  it("inferArrivalAt uses the activity buffer end-to-end", () => {
+    expect(
+      inferArrivalAt({ ...kidEvent, category: "game", activityBufferMinutes: 25 }, rules)
+    ).toBe("2026-09-01T19:35:00.000Z");
+  });
+
+  it("describeActivityArrival names the activity", () => {
+    expect(describeActivityArrival(45, "Varsity Football")).toBe(
+      "Auto · 45 min early (Varsity Football)"
+    );
   });
 });

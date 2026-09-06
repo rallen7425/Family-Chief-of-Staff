@@ -16,7 +16,7 @@ interface EventRowProps {
  * Arrival rules / linkables come from EntryEditingProvider context. */
 export function EventRow({ event, familyMembers, children }: EventRowProps) {
   const [open, setOpen] = useState(false);
-  const { arrivalRules, linkables } = useEntryEditing();
+  const { arrivalRules, linkables, activitiesByMember } = useEntryEditing();
 
   return (
     <>
@@ -29,6 +29,7 @@ export function EventRow({ event, familyMembers, children }: EventRowProps) {
           familyMembers={familyMembers}
           arrivalRules={arrivalRules}
           linkables={linkables}
+          activitiesByMember={activitiesByMember}
           open={open}
           onClose={() => setOpen(false)}
         />

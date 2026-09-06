@@ -15,6 +15,10 @@ interface InferArrivalOpts {
   category?: string | null;
   subjectMemberId: string | null;
   subjectIsAdult: boolean;
+  /** The bound activity's own "arrive N min early" (member_details.
+   * arrival_buffer_minutes). When set it wins over the category rules and
+   * applies for ANY subject, adults included. */
+  activityBufferMinutes?: number | null;
 }
 
 /**
@@ -39,15 +43,28 @@ export function matchArrivalRule(
   return rules.find((r) => r.category == null) ?? null;
 }
 
+/** The buffer to apply and where it came from: the bound activity's own
+ * buffer wins, otherwise a category / general rule, otherwise nothing. */
+export function resolveArrivalBuffer(
+  opts: InferArrivalOpts,
+  rules: ArrivalBufferRule[]
+): { minutes: number; source: "activity" | "rule" } | null {
+  if (opts.activityBufferMinutes != null && opts.activityBufferMinutes >= 0) {
+    return { minutes: opts.activityBufferMinutes, source: "activity" };
+  }
+  const rule = matchArrivalRule(opts, rules);
+  return rule ? { minutes: rule.bufferMinutes, source: "rule" } : null;
+}
+
 /**
  * Inferred arrival instant (ISO) for an entry with a start time and no
- * manually-set / stated arrival, or null when no rule applies.
+ * manually-set / stated arrival, or null when nothing applies.
  */
 export function inferArrivalAt(opts: InferArrivalOpts, rules: ArrivalBufferRule[]): string | null {
   if (!opts.startsAt) return null;
-  const rule = matchArrivalRule(opts, rules);
-  if (!rule) return null;
-  return new Date(new Date(opts.startsAt).getTime() - rule.bufferMinutes * 60_000).toISOString();
+  const buffer = resolveArrivalBuffer(opts, rules);
+  if (!buffer) return null;
+  return new Date(new Date(opts.startsAt).getTime() - buffer.minutes * 60_000).toISOString();
 }
 
 /** Human-readable provenance for an arrival badge, e.g.
@@ -55,4 +72,9 @@ export function inferArrivalAt(opts: InferArrivalOpts, rules: ArrivalBufferRule[
 export function describeArrivalRule(rule: ArrivalBufferRule): string {
   const scope = rule.category ? `${rule.category} default` : "kids' activity default";
   return `Auto · ${rule.bufferMinutes} min early (${scope})`;
+}
+
+/** Badge text when the buffer comes from a bound activity. */
+export function describeActivityArrival(minutes: number, activityName: string): string {
+  return `Auto · ${minutes} min early (${activityName})`;
 }

@@ -11,13 +11,14 @@ import { describeVisibility } from "@/lib/visibility";
 import { ACCENT_HEX } from "@/lib/colors";
 import { ASSISTANT_NAME } from "@/lib/config";
 import type { ArrivalBufferRule } from "@/lib/arrival";
-import type { CalendarEvent, EntryKind, FamilyMember, SourceType } from "@/lib/types";
+import type { CalendarEvent, EntryKind, FamilyMember, MemberDetail, SourceType } from "@/lib/types";
 
 interface EntryDetailsModalProps {
   event: CalendarEvent;
   familyMembers: FamilyMember[];
   arrivalRules: ArrivalBufferRule[];
   linkables?: LinkableEntry[];
+  activitiesByMember?: Record<string, MemberDetail[]>;
   open: boolean;
   onClose: () => void;
   startInEditMode?: boolean;
@@ -58,6 +59,7 @@ function toInitialValues(event: CalendarEvent): EntryFormInitialValues {
     location: event.location ?? "",
     notes: event.notes ?? "",
     linkedEntryId: event.linkedEntryId ?? "",
+    memberDetailId: event.memberDetailId ?? "",
     repeatsWeekly: false,
     repeatUntil: "",
   };
@@ -207,6 +209,7 @@ export function EntryDetailsModal({
   familyMembers,
   arrivalRules,
   linkables = [],
+  activitiesByMember = {},
   open,
   onClose,
   startInEditMode = false,
@@ -262,6 +265,7 @@ export function EntryDetailsModal({
             familyMembers={familyMembers}
             arrivalRules={arrivalRules}
             linkables={linkables}
+            activitiesByMember={activitiesByMember}
             initialValues={toInitialValues(event)}
             onSubmit={(input) => updateEntry(event.id, input)}
             onSuccess={onClose}

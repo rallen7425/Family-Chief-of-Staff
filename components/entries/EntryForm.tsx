@@ -2,8 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { format } from "date-fns";
-import type { ArrivalSource, EntryInput, EntryKind, FamilyMember } from "@/lib/types";
-import { matchArrivalRule, describeArrivalRule, type ArrivalBufferRule } from "@/lib/arrival";
+import type { ArrivalSource, EntryInput, EntryKind, FamilyMember, MemberDetail } from "@/lib/types";
+import {
+  matchArrivalRule,
+  describeArrivalRule,
+  describeActivityArrival,
+  type ArrivalBufferRule,
+} from "@/lib/arrival";
 import { FORM_INPUT_CLASS, FORM_LABEL_CLASS } from "@/components/shared/formStyles";
 import { DatePickerButton } from "@/components/shared/DatePickerButton";
 import { TimePickerButton } from "@/components/shared/TimePickerButton";
@@ -32,6 +37,7 @@ export interface EntryFormInitialValues {
   location: string;
   notes: string;
   linkedEntryId: string;
+  memberDetailId: string;
   repeatsWeekly: boolean;
   repeatUntil: string;
 }
@@ -48,6 +54,9 @@ interface EntryFormProps {
   familyMembers: FamilyMember[];
   arrivalRules: ArrivalBufferRule[];
   linkables?: LinkableEntry[];
+  /** The subject member's activities (member_details), keyed by member id.
+   * Powers the "Activity" picker; omit to hide it. */
+  activitiesByMember?: Record<string, MemberDetail[]>;
   initialValues?: Partial<EntryFormInitialValues>;
   /** create = full form incl. Kind selector + Repeats; edit = kind/roles
    * locked, no Repeats. */
@@ -79,6 +88,7 @@ function defaults(v?: Partial<EntryFormInitialValues>): EntryFormInitialValues {
     location: v?.location ?? "",
     notes: v?.notes ?? "",
     linkedEntryId: v?.linkedEntryId ?? "",
+    memberDetailId: v?.memberDetailId ?? "",
     repeatsWeekly: v?.repeatsWeekly ?? false,
     repeatUntil: v?.repeatUntil ?? "",
   };
@@ -88,6 +98,7 @@ export function EntryForm({
   familyMembers,
   arrivalRules,
   linkables = [],
+  activitiesByMember = {},
   initialValues,
   mode,
   kindLocked = false,
@@ -113,6 +124,7 @@ export function EntryForm({
   const [location, setLocation] = useState(init.location);
   const [notes, setNotes] = useState(init.notes);
   const [linkedEntryId, setLinkedEntryId] = useState(init.linkedEntryId);
+  const [memberDetailId, setMemberDetailId] = useState(init.memberDetailId);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [repeatsWeekly, setRepeatsWeekly] = useState(init.repeatsWeekly);
   const [repeatUntil, setRepeatUntil] = useState(init.repeatUntil);
@@ -132,18 +144,44 @@ export function EntryForm({
   const showCategory = isEvent || isReminder;
   const showLocation = !isTask;
 
-  // Auto arrival: kid-subject event, no manual override, category + start known.
+  const subjectActivities = subjectMemberId ? activitiesByMember[subjectMemberId] ?? [] : [];
+  const showActivity = isEvent && subjectActivities.length > 0;
+  const boundActivity = subjectActivities.find((a) => a.id === memberDetailId) ?? null;
+
+  // Auto arrival: a bound activity's own buffer wins; otherwise a category /
+  // general rule (kid-subject only). Needs a start time and no manual override.
   const autoArrival = useMemo(() => {
     if (!isEvent || arrivalSource === "manual" || !date || !time) return null;
+    const start = new Date(`${date}T${time}`);
+    if (boundActivity?.arrivalBufferMinutes != null) {
+      const mins = boundActivity.arrivalBufferMinutes;
+      const at = new Date(start.getTime() - mins * 60_000);
+      return {
+        bufferMinutes: mins,
+        label: format(at, "h:mm a"),
+        hhmm: format(at, "HH:mm"),
+        badge: describeActivityArrival(mins, boundActivity.value),
+      };
+    }
     const rule = matchArrivalRule(
-      { kind: "event", startsAt: `${date}T${time}`, category: category || undefined, subjectMemberId: subjectMemberId || null, subjectIsAdult },
+      {
+        kind: "event",
+        startsAt: `${date}T${time}`,
+        category: category || boundActivity?.category || undefined,
+        subjectMemberId: subjectMemberId || null,
+        subjectIsAdult,
+      },
       arrivalRules
     );
     if (!rule) return null;
-    const start = new Date(`${date}T${time}`);
     const at = new Date(start.getTime() - rule.bufferMinutes * 60_000);
-    return { rule, label: format(at, "h:mm a"), hhmm: format(at, "HH:mm") };
-  }, [isEvent, arrivalSource, date, time, category, subjectMemberId, subjectIsAdult, arrivalRules]);
+    return {
+      bufferMinutes: rule.bufferMinutes,
+      label: format(at, "h:mm a"),
+      hhmm: format(at, "HH:mm"),
+      badge: describeArrivalRule(rule),
+    };
+  }, [isEvent, arrivalSource, date, time, category, subjectMemberId, subjectIsAdult, arrivalRules, boundActivity]);
 
   const effectiveArrivalTime = arrivalSource === "manual" ? arrivalTime : autoArrival?.hhmm ?? arrivalTime;
   const arrivalBadge =
@@ -152,7 +190,7 @@ export function EntryForm({
       : arrivalSource === "stated"
         ? { text: `From email · report by ${arrivalTime}`, tone: "purple" as const }
         : autoArrival
-          ? { text: describeArrivalRule(autoArrival.rule), tone: "purple" as const }
+          ? { text: autoArrival.badge, tone: "purple" as const }
           : null;
 
   function selectKind(k: EntryKind) {
@@ -162,10 +200,12 @@ export function EntryForm({
       setOwnerMemberIds([]);
     }
     if (k !== "event" && k !== "task") setOwnerMemberIds([]);
+    if (k !== "event") setMemberDetailId("");
   }
 
   function selectSubject(id: string) {
     setSubjectMemberId(id);
+    setMemberDetailId(""); // an activity belongs to one member
     const m = familyMembers.find((x) => x.id === id);
     // Adult subject → personal entry, no separate owner (§6b). Kid / whole
     // family → leave Owner as the user last set it.
@@ -196,7 +236,9 @@ export function EntryForm({
         arrivalAt = new Date(`${date}T${arrivalTime}`).toISOString();
         resolvedArrivalSource = "stated";
       } else if (autoArrival) {
-        arrivalAt = new Date(new Date(`${date}T${time}`).getTime() - autoArrival.rule.bufferMinutes * 60_000).toISOString();
+        arrivalAt = new Date(
+          new Date(`${date}T${time}`).getTime() - autoArrival.bufferMinutes * 60_000
+        ).toISOString();
         resolvedArrivalSource = "inferred";
       }
     }
@@ -219,6 +261,7 @@ export function EntryForm({
       arrivalAt,
       arrivalSource: resolvedArrivalSource,
       linkedEntryId: isReminder ? linkedEntryId || null : null,
+      memberDetailId: isEvent ? memberDetailId || null : null,
       recurrence:
         isEvent && repeatsWeekly
           ? {
@@ -433,6 +476,32 @@ export function EntryForm({
           ) : (
             <p className="text-[15px] text-ink py-2.5 capitalize">{category || "None"}</p>
           )}
+        </div>
+      )}
+
+      {showActivity && (
+        <div>
+          <label className={FORM_LABEL_CLASS} htmlFor="entry-activity">
+            Activity
+          </label>
+          <select
+            id="entry-activity"
+            className={FORM_INPUT_CLASS}
+            value={memberDetailId}
+            onChange={(e) => setMemberDetailId(e.target.value)}
+          >
+            <option value="">None</option>
+            {subjectActivities.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.value}
+                {a.arrivalBufferMinutes != null ? ` · arrive ${a.arrivalBufferMinutes}m early` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11.5px] text-muted-label leading-relaxed">
+            Links this to one of {subject?.name ?? "their"}&rsquo;s activities and uses its arrival
+            buffer.
+          </p>
         </div>
       )}
 

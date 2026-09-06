@@ -14,6 +14,7 @@ import {
 import { getEventsInRange, getLinkableOptions } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { parseDateParam, formatDateParam } from "@/lib/dateParam";
 import type { CalendarEvent, ScheduleViewMode } from "@/lib/types";
 import { ViewModeSwitcher } from "@/components/schedule/ViewModeSwitcher";
@@ -46,10 +47,11 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   const person = typeof searchParams.person === "string" ? searchParams.person : "all";
   const date = parseDateParam(typeof searchParams.date === "string" ? searchParams.date : undefined);
 
-  const [familyMembers, arrivalRules, linkableOptions] = await Promise.all([
+  const [familyMembers, arrivalRules, linkableOptions, activitiesByMember] = await Promise.all([
     getFamilyMembers(),
     getArrivalBufferRules(),
     getLinkableOptions(),
+    getActivitiesByMember(),
   ]);
 
   function buildHref(overrides: { view?: ScheduleViewMode; date?: Date; person?: string }) {
@@ -110,6 +112,7 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
           familyMembers={familyMembers}
           arrivalRules={arrivalRules}
           linkables={linkableOptions}
+          activitiesByMember={activitiesByMember}
           defaultKind="event"
           label="Add event"
         />
@@ -132,7 +135,11 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
         buildHref={(personId) => buildHref({ person: personId })}
       />
 
-      <EntryEditingProvider arrivalRules={arrivalRules} linkables={linkableOptions}>
+      <EntryEditingProvider
+        arrivalRules={arrivalRules}
+        linkables={linkableOptions}
+        activitiesByMember={activitiesByMember}
+      >
         {view === "day" && <DayView date={date} events={events} familyMembers={familyMembers} />}
         {view === "3day" && (
           <ThreeDayView

@@ -6,12 +6,13 @@ import { Modal } from "@/components/shared/Modal";
 import { EntryForm, type LinkableEntry } from "@/components/entries/EntryForm";
 import { createEntry } from "@/lib/actions/entries";
 import type { ArrivalBufferRule } from "@/lib/arrival";
-import type { EntryKind, FamilyMember } from "@/lib/types";
+import type { EntryKind, FamilyMember, MemberDetail } from "@/lib/types";
 
 interface AddEntryDialogProps {
   familyMembers: FamilyMember[];
   arrivalRules: ArrivalBufferRule[];
   linkables?: LinkableEntry[];
+  activitiesByMember?: Record<string, MemberDetail[]>;
   defaultKind?: EntryKind;
   label?: string;
 }
@@ -20,6 +21,7 @@ export function AddEntryDialog({
   familyMembers,
   arrivalRules,
   linkables = [],
+  activitiesByMember = {},
   defaultKind = "event",
   label = "Add entry",
 }: AddEntryDialogProps) {
@@ -42,6 +44,7 @@ export function AddEntryDialog({
             familyMembers={familyMembers}
             arrivalRules={arrivalRules}
             linkables={linkables}
+            activitiesByMember={activitiesByMember}
             initialValues={{ kind: defaultKind }}
             onSubmit={(input) => createEntry(input)}
             onSuccess={() => setOpen(false)}
