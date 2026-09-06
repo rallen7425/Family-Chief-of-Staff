@@ -4,6 +4,16 @@ import { inferArrivalAt, type ArrivalBufferRule } from "@/lib/arrival";
 import type { EntryKind, FamilyMember, SourceDetail } from "@/lib/types";
 import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 import type { ExtractedItem } from "./extract/extractEvents";
+import {
+  addDays,
+  buildMergePatch,
+  llmDisambiguate,
+  triageCandidates,
+  type ExistingEntry,
+} from "./dedupe";
+
+const DEDUPE_COLS =
+  "id,kind,title,starts_at,ends_at,due_at,is_all_day,location_text,notes,category,subject_member_id,arrival_at,arrival_source,status,source_detail";
 
 export interface MessageMeta {
   gmailMessageId: string;
@@ -102,17 +112,47 @@ export function pickReminderParent(
   return best && best.score > 0 ? best.id : null;
 }
 
+/** Existing non-dismissed entries within ±1 day of a new item that could be
+ * the same real-world thing — the pool cross-email dedupe reasons over. */
+async function fetchDuplicateCandidates(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  item: ExtractedItem,
+  meta: MessageMeta
+): Promise<ExistingEntry[]> {
+  if (!item.date || item.kind === "reminder") return [];
+
+  let query = supabase.from("entries").select(DEDUPE_COLS).neq("status", "dismissed");
+  if (item.kind === "task") {
+    query = query
+      .eq("kind", "task")
+      .gte("due_at", addDays(item.date, -1))
+      .lte("due_at", addDays(item.date, 1));
+  } else {
+    // Generous UTC bounds around local days [date-1 .. date+1];
+    // triageCandidates re-checks the exact household-local date.
+    query = query
+      .in("kind", ["event", "advisory"])
+      .gte("starts_at", householdLocalToInstant(addDays(item.date, -1)))
+      .lt("starts_at", householdLocalToInstant(addDays(item.date, 2)));
+  }
+
+  const { data, error } = await query.returns<ExistingEntry[]>();
+  if (error) throw error;
+  return (data ?? []).filter((e) => e.source_detail?.gmailMessageId !== meta.gmailMessageId);
+}
+
 export async function writeExtractedItems(
   items: ExtractedItem[],
   meta: MessageMeta,
   familyMembers: FamilyMember[],
   emailDomains: MemberEmailDomain[],
   arrivalRules: ArrivalBufferRule[]
-): Promise<{ eventsCreated: number; todosCreated: number }> {
+): Promise<{ eventsCreated: number; todosCreated: number; merged: number }> {
   const supabase = getSupabaseClient();
   const domainMemberId = resolveByDomain(meta.sender, emailDomains);
   let eventsCreated = 0;
   let todosCreated = 0;
+  let merged = 0;
 
   /** Inserts one extracted item; returns its new row id (null if skipped). */
   const insertItem = async (
@@ -136,7 +176,10 @@ export async function writeExtractedItems(
 
     let arrivalAt: string | null = null;
     let arrivalSource: "stated" | "inferred" | null = null;
-    if (kind === "event" && item.date) {
+    // Only a timed event gets an arrival — an all-day entry (holiday, no-school,
+    // spirit day) has no meaningful "arrive by", and inferring one against
+    // local midnight produced nonsense like "arrive 11:45 PM the night before".
+    if (kind === "event" && item.date && item.time) {
       if (item.arrival_time) {
         arrivalAt = householdLocalToInstant(item.date, item.arrival_time);
         arrivalSource = "stated";
@@ -204,6 +247,26 @@ export async function writeExtractedItems(
   const parents: { id: string; title: string; kind: EntryKind }[] = [];
   for (const item of items) {
     if (item.kind === "reminder") continue;
+
+    // Cross-email dedupe: does an existing entry already represent this?
+    const subjectId =
+      item.kind === "advisory"
+        ? null
+        : resolvePerson(item.person_hint, domainMemberId, familyMembers);
+    const candidates = await fetchDuplicateCandidates(supabase, item, meta);
+    const { certain, maybes } = triageCandidates(item, candidates, subjectId);
+    const dupe = certain ?? (maybes.length ? await llmDisambiguate(item, maybes) : null);
+
+    if (dupe) {
+      const { patch } = buildMergePatch(dupe, item, meta, subjectId);
+      const { error } = await supabase.from("entries").update(patch).eq("id", dupe.id);
+      if (error) throw error;
+      merged++;
+      // A sibling reminder from this same email can still attach to the survivor.
+      parents.push({ id: dupe.id, title: dupe.title, kind: dupe.kind });
+      continue;
+    }
+
     const id = await insertItem(item, null);
     if (id) parents.push({ id, title: item.title, kind: item.kind });
   }
@@ -215,5 +278,5 @@ export async function writeExtractedItems(
     await insertItem(item, pickReminderParent(item, parentPool));
   }
 
-  return { eventsCreated, todosCreated };
+  return { eventsCreated, todosCreated, merged };
 }

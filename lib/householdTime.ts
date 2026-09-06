@@ -19,3 +19,14 @@ export function householdLocalToInstant(date: string, time?: string | null): str
   const tzDate = new TZDate(isoLocal, HOUSEHOLD_TIMEZONE);
   return new Date(tzDate.getTime()).toISOString();
 }
+
+/** The household-local calendar date ("YYYY-MM-DD") of a UTC-instant ISO
+ * string — e.g. 2026-09-07T02:30:00Z is still "2026-09-06" in America/New_York.
+ * Used by cross-email dedupe to decide whether two entries fall on the same
+ * local day regardless of how their instants were stored. */
+export function householdLocalDate(instantIso: string): string {
+  const d = new TZDate(new Date(instantIso), HOUSEHOLD_TIMEZONE);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}

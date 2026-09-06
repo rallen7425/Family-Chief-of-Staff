@@ -78,6 +78,14 @@ export interface SourceDetail {
   receivedAt?: string;
   /** The connected Gmail mailbox this was scanned from (email_scan only). */
   googleAccountEmail?: string;
+  /** Other emails found to describe this same real-world entry and folded
+   * into this row by cross-email dedupe (email_scan only). */
+  mergedSources?: {
+    gmailMessageId?: string;
+    subject?: string;
+    sender?: string;
+    extractedSnippet?: string;
+  }[];
 }
 
 export type BusyStatus = "busy" | "free";
