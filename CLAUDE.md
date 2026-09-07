@@ -15,6 +15,197 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-07) — Email/Calendar Connectors: review, plan, Phase 0 + Phase 1 (DEPLOYED — paused for one manual reconnect click)
+
+Two threads: (1) fixed the Gmail-scan cron failure carried over from
+2026-09-06 (root cause: OAuth token 7-day expiry in "Testing" status —
+published the Google consent screen, which required adding a real
+`/privacy` page); (2) the user asked for a full review + plan for a
+proper multi-provider (Gmail today, Microsoft 365/Outlook/Hotmail next)
+email + calendar connector system — per-member add/pause/delete,
+calendar pull+push — then said to start building it. **Phases 0 and 1 of
+5 are built, verified live, committed, and deployed.**
+
+### RESUME HERE — one manual step, then re-verify, then move to Phase 2
+
+The Google OAuth client had to be swapped mid-session (see "What went
+sideways" below), which left the household's one real Gmail connection in
+`needs_reconnect` status. **Nothing is broken or lost** — this is the
+exact "needs reconnect" UX Phase 1 was built to surface — but it needs a
+real human click to clear:
+
+1. Open `/profile` on `family-chief-of-staff.vercel.app`, find "Connected
+   accounts", click **Reconnect** next to `rallen7425@gmail.com`, sign in,
+   click through the "unverified app" warning (expected — same as every
+   other re-auth this session), Allow.
+2. Confirm the banner says "Account connected" and the pill flips back to
+   **Connected**.
+3. `curl -X POST -H "x-cron-secret: $CRON_SECRET" https://family-chief-of-staff.vercel.app/api/pipeline/email-scan`
+   → expect `"success":true`, `"errors":0`.
+4. Then proceed to **Phase 2** (Google Calendar two-way sync) per
+   `email-calendar-connectors-plan.md` §6 — no implementation-prompt file
+   exists for it yet; write one (mirroring
+   `email-calendar-connectors-implementation-prompt.md`'s structure)
+   before starting, or ask the user how they want to scope that session.
+
+### State right now
+
+| | |
+|---|---|
+| **Production** | Latest deploy has Phase 0 + Phase 1 + the client-consolidation fix live. All routes smoke-checked 200 (`/`, `/profile`, `/settings/accounts`, `/settings`, `/family`, `/schedule`). |
+| **`family-chief-of-staff`** | `main` @ `c9f2839`'s sibling commit `584355c` (Phase 1) on top of `2fc0ec2` (Phase 0) — both pushed. |
+| **`rocky-coast-labs`** | `main` @ `c9f2839` — `20260907000001` (`email_connections` + `calendar_sync_links`) and `20260907000002` (drop `gmail_credentials`) both applied to the shared DB and pushed. |
+| **Checks** | `tsc` / eslint / **159 tests** / `next build` all green after every change this session. |
+| **The one real connection** | `rallen7425@gmail.com`, owned by Rick, status **`needs_reconnect`** (`last_error: "unauthorized_client"`) pending the manual step above. |
+
+### Review + Plan (before any code)
+
+Full architecture review (`Explore` agent covering the Gmail credential
+storage, pipeline wiring, Settings UI, family-member data model,
+confirmed zero existing Calendar API usage, dependencies, test coverage,
+cron mechanics) found the core blocker: `gmail_credentials` was a
+DB-enforced singleton (`id smallint check (id = 1)`), OAuth was a local
+CLI script with no per-member link, and the pipeline had zero provider
+abstraction. Findings + the full phased plan are written to
+**`email-calendar-connectors-plan.md`** (architecture decisions: stays
+single-household but schema avoids blocking future multi-household work,
+full two-way calendar sync not read-only-first, token encryption at rest
+now) and **`email-calendar-connectors-implementation-prompt.md`** (Phase
+0 + Phase 1 concrete file-level directives — the phases actually built
+this session). Both untracked in the repo root, same convention as the
+other `*-plan.md` / `*-implementation-prompt.md` pairs already there.
+
+### Phase 0 — foundational schema + provider abstraction rebuild
+
+Behavior-neutral by design, verified as such: the pipeline was run
+end-to-end against the real inbox both locally and via the deployed route
+before *and* after, 0 errors both times, identical dedupe/event-creation
+behavior.
+
+- **New tables** (`rocky-coast-labs` migration `20260907000001`):
+  `email_connections` (per-family-member, multi-provider `provider in
+  ('google','microsoft')`, `status in ('active','paused',
+  'needs_reconnect','disconnected')`, `email_enabled`/`calendar_enabled`
+  booleans, AES-256-GCM-encrypted `refresh_token_enc`/`access_token_enc`
+  as `bytea`, `UNIQUE(provider, external_account_email)`) and
+  `calendar_sync_links` (unused until Phase 2 — entry↔external-event
+  mapping). `email_scan_log` gained a nullable `connection_id`.
+  `gmail_credentials`'s one row was backfilled into `email_connections`
+  (owner resolved via the same logic `/settings/accounts` used to display
+  attribution), then — once Phase 1 confirmed nothing read the old table
+  anymore — dropped in migration `20260907000002`.
+- **`lib/security/tokenCrypto.ts`** (new, 4 tests): AES-256-GCM
+  encrypt/decrypt, key from new env var `CONNECTOR_TOKEN_ENCRYPTION_KEY`
+  (32-byte base64, set in `.env.local` + Vercel production). Plus
+  `encodeHexBytea`/`decodeHexBytea` — PostgREST represents `bytea` as a
+  `\x`-prefixed hex string on both read and write.
+- **Provider abstraction**: new `scripts/pipeline/providers/types.ts`
+  (`EmailProvider` interface, `NormalizedEmailMessage`,
+  `EmailConnection` — the decrypted-and-ready shape provider code
+  receives, never touching encryption itself). Existing Gmail code moved
+  from `scripts/pipeline/gmail/` to `scripts/pipeline/providers/google/`
+  (`client.ts`, `email.ts`), conforming to the interface.
+  `scripts/pipeline/index.ts` rewritten from a single-mailbox script into
+  a connection-looping dispatcher (`providers[connection.provider]`,
+  deliberately a `Partial` record — an unimplemented provider fails
+  loudly, never silently misroutes). Per-connection message cap (was
+  global `MAX_MESSAGES_PER_RUN=8`, now 8 *per connection*) and
+  connection-scoped dedupe (`email_scan_log` lookup now filters by
+  `connection_id` — a real gap the old global-message-id dedupe had once
+  more than one mailbox could exist).
+- **Route renamed** `gmail-scan` → `email-scan`
+  (`app/api/pipeline/email-scan/route.ts`,
+  `.github/workflows/email-scan.yml` — same `CRON_SECRET`/`APP_URL`, no
+  repo secret changes needed), `maxDuration` 60 → 280 (Vercel's platform
+  default is now 300s, not 60-90s — see the vercel-knowledge-update system
+  note from this session).
+- **`lib/types.ts` `SourceDetail`**: `googleAccountEmail` marked
+  `@deprecated` (old rows keep it, never rewritten), new
+  provider-agnostic `provider`/`accountEmail`/`connectionId` fields for
+  rows written going forward.
+
+### Phase 1 — real in-app Google OAuth, per-member connect/pause/delete
+
+- **New routes** `app/api/connectors/google/start` (redirects to Google's
+  consent screen; "who's connecting" = whoever `fcos_active_member`
+  currently resolves to — same no-auth trust model as everything else in
+  this app) and `.../callback` (exchanges code, encrypts tokens, upserts
+  `email_connections`; a CSRF nonce round-trips via a short-lived
+  `fcos_oauth_state` httpOnly cookie + the OAuth `state` param; refuses to
+  silently reassign an account already connected to a different member).
+- **`lib/actions/emailConnections.ts`**: `pauseConnection`/
+  `resumeConnection`/`deleteConnection`, each ownership-checked against
+  the active member. `deleteConnection` best-effort revokes the Google
+  grant (`oauth2.googleapis.com/revoke`) before deleting the row.
+- **`/profile`** gained a "Connected accounts" section
+  (`components/profile/ConnectedAccounts.tsx`) — self-service, a member
+  sees only their own connections: status pill (including a
+  **`needs_reconnect`** badge with the stored error + a Reconnect link —
+  this is new: a dead refresh token used to just fail every cron run
+  silently until someone went and read GitHub Actions logs, exactly what
+  happened on 2026-09-06/07), Pause/Resume, Delete (inline confirm,
+  mirroring the established "Delete entry" pattern — no native
+  `confirm()`), "Connect Gmail".
+- **`/settings/accounts`** converted from a mock into a **read-only**
+  household oversight dashboard (every member's connection status +
+  last-synced time, HoH-gated as before) — no controls; management always
+  happens on the owning member's own profile now.
+- **Retired**: `scripts/gmail/get-refresh-token.ts` (the CLI script —
+  superseded, and would now write to a dropped table) and
+  `scripts/maintenance/backfill-email-connections.ts` (one-off, already
+  run in Phase 0).
+
+### What went sideways (both caught and fixed before/during deploy, not after)
+
+- **Bug**: `assertOwnership()` and the OAuth routes originally checked the
+  raw `fcos_active_member` cookie via `getActiveMemberId()`. On a session
+  that never explicitly set that cookie (the normal case — the rest of
+  the app falls back to the first head-of-household), this returned
+  `null` and every connector action failed with "Not signed in." Caught
+  live by actually clicking Pause in a browser, not just from tests.
+  Fixed: use `getActiveMember(familyMembers)` — the same fallback-aware
+  resolution the rest of the app already uses — everywhere a connector
+  action needs "who is this."
+- **Infra gap**: the original Google OAuth client
+  ("Family Chief of Staff local setup") is type **Desktop app**, which
+  cannot register an HTTPS redirect URI at all —
+  `/api/connectors/google/start` hit a real `redirect_uri_mismatch`.
+  Created a new **Web application** client ("Family Chief of Staff web
+  app") in the same GCP project with the real callback URL registered.
+- **Near-miss, self-corrected**: initially pointed the shared
+  `GMAIL_OAUTH_CLIENT_ID`/`SECRET` at the new Web client for *both* the
+  new OAuth flow and the existing pipeline. Caught before it could cause
+  harm: a refresh token is bound to the exact client that issued it, and
+  the real production connection's stored token was issued by the old
+  Desktop client — pointing the pipeline at a different client would
+  reintroduce the exact `invalid_grant`/cron-failure class of bug fixed
+  earlier this session. Reverted, ran both flows on separate env vars to
+  isolate the fix, confirmed both worked independently, **then**
+  consolidated for real: since every future connection (including a
+  live-tested reconnect of the real account) is minted by the Web client
+  going forward, the Desktop client is now fully retired — one client,
+  `GMAIL_OAUTH_CLIENT_ID`/`SECRET`, used everywhere. The live
+  reconnect-through-Web-client test (done to verify Phase 1) is exactly
+  what left the real connection in `needs_reconnect` — it briefly held a
+  Web-client token while the pipeline still pointed at the Desktop
+  client, failed one real cron-equivalent call (`unauthorized_client`,
+  correctly caught and surfaced rather than silently swallowed — the
+  Phase 1 error-surfacing feature validating itself in real time), and
+  needs the one manual reconnect above to finish clearing.
+- **GCP console note for later**: the old "Family Chief of Staff local
+  setup" Desktop client is dormant, not deleted — harmless to leave, fine
+  to delete later as cleanup once confirmed nothing references it.
+
+### Deferred / explicitly out of scope this round
+
+Per `email-calendar-connectors-plan.md` §10 and the implementation
+prompt's own scope note: Calendar sync (Phase 2), Microsoft/Outlook/
+Hotmail (Phase 3/4), real multi-household tenancy, and hardening
+(Phase 5 — provider-layer test coverage, rate limiting) are all
+unbuilt by design, not overlooked.
+
+---
+
 ## Session status (2026-09-06) — schedule dedupe / holidays + Profile & Family rework (DEPLOYED — paused for on-device verification)
 
 Three real-usage bug reports; the third grew into a feature rework. **All merged
