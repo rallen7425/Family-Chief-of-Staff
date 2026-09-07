@@ -97,3 +97,25 @@ export interface NotificationDismissalRow {
   notification_id: string;
   dismissed_at: string;
 }
+
+/** `family_chief_of_staff.email_connections` — one row per (provider,
+ * external account), owned by exactly one family member. Replaces the old
+ * `gmail_credentials` singleton. Token columns are AES-256-GCM ciphertext
+ * (lib/security/tokenCrypto.ts) — never read/written as plaintext. */
+export interface EmailConnectionRow {
+  id: string;
+  family_member_id: string;
+  provider: "google" | "microsoft";
+  external_account_email: string;
+  status: "active" | "paused" | "needs_reconnect" | "disconnected";
+  email_enabled: boolean;
+  calendar_enabled: boolean;
+  scopes: string[];
+  refresh_token_enc: string; // bytea comes back from PostgREST as a hex-encoded string ("\\x...")
+  access_token_enc: string | null;
+  token_expiry: string | null;
+  last_synced_at: string | null;
+  last_error: string | null;
+  connected_at: string;
+  updated_at: string;
+}

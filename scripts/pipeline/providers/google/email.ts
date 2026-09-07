@@ -1,35 +1,19 @@
 import type { gmail_v1 } from "googleapis";
-
-export interface FetchedAttachment {
-  filename: string;
-  mimeType: string;
-  attachmentId: string;
-}
-
-export interface FetchedMessage {
-  id: string;
-  threadId: string;
-  sender: string;
-  subject: string;
-  receivedAt: string | null; // ISO, from internalDate
-  bodyText: string;
-  attachments: FetchedAttachment[];
-}
+import { getGmailClient } from "./client";
+import type { EmailConnection, EmailProvider, FetchedAttachment, NormalizedEmailMessage } from "../types";
 
 const SUPPORTED_ATTACHMENT_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   "application/pdf",
 ]);
 
-export async function listRecentMessageIds(
-  gmail: gmail_v1.Gmail,
-  // 4-day window (cron runs every 2h) gives comfortable slack: the pipeline
-  // processes at most MAX_MESSAGES_PER_RUN new messages per run, so during a
-  // backlog an unprocessed message must survive several runs before its turn —
-  // a 2-day window could let the oldest ones age out unseen.
-  query = "newer_than:4d"
-): Promise<string[]> {
-  const res = await gmail.users.messages.list({ userId: "me", q: query, maxResults: 50 });
+async function listRecentMessageIds(connection: EmailConnection, sinceDays: number): Promise<string[]> {
+  const gmail = getGmailClient(connection);
+  const res = await gmail.users.messages.list({
+    userId: "me",
+    q: `newer_than:${sinceDays}d`,
+    maxResults: 50,
+  });
   return (res.data.messages ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
 }
 
@@ -76,7 +60,11 @@ function walkParts(part: gmail_v1.Schema$MessagePart, state: WalkState) {
   }
 }
 
-export async function fetchMessageDetail(gmail: gmail_v1.Gmail, id: string): Promise<FetchedMessage> {
+async function fetchMessageDetail(
+  connection: EmailConnection,
+  id: string
+): Promise<NormalizedEmailMessage> {
+  const gmail = getGmailClient(connection);
   const res = await gmail.users.messages.get({ userId: "me", id, format: "full" });
   const message = res.data;
   const headers = message.payload?.headers ?? [];
@@ -110,3 +98,25 @@ export async function fetchMessageDetail(gmail: gmail_v1.Gmail, id: string): Pro
     attachments: state.attachments,
   };
 }
+
+async function fetchAttachmentBuffer(
+  connection: EmailConnection,
+  messageId: string,
+  attachmentId: string
+): Promise<Buffer> {
+  const gmail = getGmailClient(connection);
+  const res = await gmail.users.messages.attachments.get({
+    userId: "me",
+    messageId,
+    id: attachmentId,
+  });
+  const data = res.data.data;
+  if (!data) throw new Error("Attachment data missing");
+  return Buffer.from(data, "base64url");
+}
+
+export const googleEmailProvider: EmailProvider = {
+  listRecentMessageIds,
+  fetchMessageDetail,
+  fetchAttachmentBuffer,
+};

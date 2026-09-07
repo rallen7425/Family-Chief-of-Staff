@@ -59,7 +59,9 @@ const meta: MessageMeta = {
   sender: "SJP Football Team Moms <x@gmail.com>",
   subject: "LABOR DAY KICKOFF PARTY",
   receivedAt: "2026-09-06T04:31:00.000Z",
-  googleAccountEmail: "rallen7425@gmail.com",
+  provider: "google",
+  accountEmail: "rallen7425@gmail.com",
+  connectionId: "conn-1",
 };
 
 describe("normalizeTitle / titleTokens", () => {

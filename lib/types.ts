@@ -81,8 +81,15 @@ export interface SourceDetail {
   extractedSnippet?: string;
   /** ISO datetime the source email was received (email_scan only). */
   receivedAt?: string;
-  /** The connected Gmail mailbox this was scanned from (email_scan only). */
+  /** @deprecated use `provider` + `accountEmail` — kept for rows written
+   * before the multi-provider connector rework so old entries keep
+   * rendering their existing provenance. */
   googleAccountEmail?: string;
+  /** Which provider/connection this was scanned from (email_scan only,
+   * post-connector-rework rows). */
+  provider?: "google" | "microsoft";
+  accountEmail?: string;
+  connectionId?: string;
   /** Other emails found to describe this same real-world entry and folded
    * into this row by cross-email dedupe (email_scan only). */
   mergedSources?: {

@@ -106,7 +106,12 @@ function pseudoMeta(r: Row): MessageMeta {
     sender: sd.sender ?? "",
     subject: sd.subject ?? r.title,
     receivedAt: sd.receivedAt ?? null,
-    googleAccountEmail: sd.googleAccountEmail ?? null,
+    // Every row that exists as of this maintenance script predates the
+    // multi-provider connector rework, so it's always Gmail — fall back to
+    // the deprecated googleAccountEmail field these old rows actually have.
+    provider: sd.provider ?? "google",
+    accountEmail: sd.accountEmail ?? sd.googleAccountEmail ?? "",
+    connectionId: sd.connectionId ?? "",
   };
 }
 

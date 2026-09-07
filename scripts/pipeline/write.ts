@@ -21,7 +21,9 @@ export interface MessageMeta {
   sender: string;
   subject: string;
   receivedAt: string | null;
-  googleAccountEmail: string | null;
+  provider: "google" | "microsoft";
+  accountEmail: string;
+  connectionId: string;
 }
 
 /** Extracts the domain from a raw `From:` header value, e.g.
@@ -68,7 +70,9 @@ function buildSourceDetail(item: ExtractedItem, meta: MessageMeta): SourceDetail
     attachmentPage: item.attachment_page ?? undefined,
     extractedSnippet: item.source_excerpt,
     receivedAt: meta.receivedAt ?? undefined,
-    googleAccountEmail: meta.googleAccountEmail ?? undefined,
+    provider: meta.provider,
+    accountEmail: meta.accountEmail,
+    connectionId: meta.connectionId,
   };
 }
 

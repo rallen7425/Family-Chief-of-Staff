@@ -9,8 +9,7 @@ const client = new Anthropic();
 
 // Up to MAX_ITERATIONS sequential Opus calls (a query_schedule round-trip
 // between each) can run long; pin the ceiling explicitly rather than relying
-// on the platform default, same as the gmail-scan route. 60s is the Vercel
-// Hobby maximum.
+// on the platform default, same as the email-scan route.
 export const maxDuration = 60;
 
 const MAX_ITERATIONS = 4;
