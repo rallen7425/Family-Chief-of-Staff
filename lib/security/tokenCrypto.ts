@@ -44,3 +44,14 @@ export function decryptToken(encrypted: Buffer): string {
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
+
+/** PostgREST represents a `bytea` column as a `\x`-prefixed hex string on
+ * both read and write — these are the two conversions every caller storing
+ * or reading email_connections.*_token_enc needs. */
+export function encodeHexBytea(buf: Buffer): string {
+  return `\\x${buf.toString("hex")}`;
+}
+
+export function decodeHexBytea(value: string): Buffer {
+  return Buffer.from(value.startsWith("\\x") ? value.slice(2) : value, "hex");
+}

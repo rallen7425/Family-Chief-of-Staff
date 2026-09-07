@@ -4,7 +4,12 @@ import type { EmailConnection } from "../types";
 /** Builds an authenticated Gmail client from an already-decrypted
  * connection's refresh token. Callers own fetching/decrypting the
  * connection row — this module only ever sees plaintext tokens in memory,
- * never touches the database or the encryption layer. */
+ * never touches the database or the encryption layer.
+ *
+ * GMAIL_OAUTH_CLIENT_ID/SECRET must be the same Web-application OAuth
+ * client as app/api/connectors/google/{start,callback} — a refresh token is
+ * bound to the exact client that issued it, so this can never point at a
+ * different client than whatever mints new connections. */
 export function getGmailClient(connection: EmailConnection): gmail_v1.Gmail {
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;

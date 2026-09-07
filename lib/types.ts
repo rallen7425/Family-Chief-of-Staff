@@ -51,6 +51,21 @@ export interface FamilyMember {
   grade?: string;
 }
 
+/** Display-only view of an `email_connections` row — never carries a token,
+ * encrypted or otherwise. See lib/data/emailConnections.ts. */
+export interface EmailConnectionSummary {
+  id: string;
+  familyMemberId: string;
+  provider: "google" | "microsoft";
+  externalAccountEmail: string;
+  status: "active" | "paused" | "needs_reconnect" | "disconnected";
+  emailEnabled: boolean;
+  calendarEnabled: boolean;
+  lastSyncedAt?: string;
+  lastError?: string;
+  connectedAt: string;
+}
+
 /** A structured secondary-profile item (activity / team / coach). */
 export interface MemberDetail {
   id: string;

@@ -1,5 +1,5 @@
 import type { EmailConnectionRow } from "@/lib/data/dbTypes";
-import { decryptToken } from "@/lib/security/tokenCrypto";
+import { decryptToken, decodeHexBytea } from "@/lib/security/tokenCrypto";
 
 /** An `email_connections` row with its tokens already decrypted, ready to
  * hand to a provider implementation. Provider code should never see
@@ -19,15 +19,9 @@ export function toEmailConnection(row: EmailConnectionRow): EmailConnection {
     familyMemberId: row.family_member_id,
     provider: row.provider,
     externalAccountEmail: row.external_account_email,
-    refreshToken: decryptToken(hexBytea(row.refresh_token_enc)),
-    accessToken: row.access_token_enc ? decryptToken(hexBytea(row.access_token_enc)) : null,
+    refreshToken: decryptToken(decodeHexBytea(row.refresh_token_enc)),
+    accessToken: row.access_token_enc ? decryptToken(decodeHexBytea(row.access_token_enc)) : null,
   };
-}
-
-/** PostgREST returns `bytea` columns as a `\x`-prefixed hex string, not raw
- * binary — decode that back into a Buffer before it reaches tokenCrypto. */
-function hexBytea(value: string): Buffer {
-  return Buffer.from(value.startsWith("\\x") ? value.slice(2) : value, "hex");
 }
 
 export interface FetchedAttachment {

@@ -3,13 +3,15 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getActiveMember } from "@/lib/activeMember";
 import { getMemberDetails } from "@/lib/data/memberDetails";
+import { getEmailConnectionsByMember } from "@/lib/data/emailConnections";
 import { initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
 import { MyProfileClient } from "@/components/profile/MyProfileClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyProfilePage() {
+export default async function MyProfilePage(props: PageProps<"/profile">) {
+  const searchParams = await props.searchParams;
   const familyMembers = await getFamilyMembers();
   const member = await getActiveMember(familyMembers);
 
@@ -22,7 +24,12 @@ export default async function MyProfilePage() {
     );
   }
 
-  const details = await getMemberDetails(member.id);
+  const [details, connections] = await Promise.all([
+    getMemberDetails(member.id),
+    getEmailConnectionsByMember(member.id),
+  ]);
+  const connected = typeof searchParams.connected === "string" ? searchParams.connected : undefined;
+  const connectError = typeof searchParams.connectError === "string" ? searchParams.connectError : undefined;
 
   return (
     <>
@@ -57,7 +64,14 @@ export default async function MyProfilePage() {
         </Link>
       )}
 
-      <MyProfileClient member={member} members={familyMembers} details={details} />
+      <MyProfileClient
+        member={member}
+        members={familyMembers}
+        details={details}
+        connections={connections}
+        connected={connected}
+        connectError={connectError}
+      />
     </>
   );
 }

@@ -4,23 +4,32 @@ import { useState } from "react";
 import { Shield } from "lucide-react";
 import { MemberProfileFields } from "@/components/profile/MemberProfileFields";
 import { AdditionalContextDetails } from "@/components/profile/AdditionalContextDetails";
+import { ConnectedAccounts } from "@/components/profile/ConnectedAccounts";
 import { ForgetDialog } from "@/components/settings/ForgetDialog";
-import type { FamilyMember, MemberDetail } from "@/lib/types";
+import type { EmailConnectionSummary, FamilyMember, MemberDetail } from "@/lib/types";
 
 export function MyProfileClient({
   member,
   members,
   details,
+  connections,
+  connected,
+  connectError,
 }: {
   member: FamilyMember;
   members: FamilyMember[];
   details: MemberDetail[];
+  connections: EmailConnectionSummary[];
+  connected?: string;
+  connectError?: string;
 }) {
   const [forgetOpen, setForgetOpen] = useState(false);
 
   return (
     <>
       <MemberProfileFields member={member} allMembers={members} mode="self" />
+
+      <ConnectedAccounts connections={connections} connected={connected} connectError={connectError} />
 
       <AdditionalContextDetails
         member={member}
