@@ -15,6 +15,8 @@ import { getEventsInRange, getLinkableOptions } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
+import { getActiveMember } from "@/lib/activeMember";
+import { effectiveIsAdult } from "@/lib/family";
 import { parseDateParam, formatDateParam } from "@/lib/dateParam";
 import type { CalendarEvent, ScheduleViewMode } from "@/lib/types";
 import { ViewModeSwitcher } from "@/components/schedule/ViewModeSwitcher";
@@ -44,7 +46,7 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   const view: ScheduleViewMode = VALID_VIEWS.includes(rawView as ScheduleViewMode)
     ? (rawView as ScheduleViewMode)
     : "day";
-  const person = typeof searchParams.person === "string" ? searchParams.person : "all";
+  const explicitPerson = typeof searchParams.person === "string" ? searchParams.person : undefined;
   const date = parseDateParam(typeof searchParams.date === "string" ? searchParams.date : undefined);
 
   const [familyMembers, arrivalRules, linkableOptions, activitiesByMember] = await Promise.all([
@@ -53,6 +55,19 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
     getLinkableOptions(),
     getActivitiesByMember(),
   ]);
+
+  // No explicit ?person= yet (a fresh nav, not a filter-chip click): default a
+  // kid's own Schedule to their own visible-to-them view (matches the Today
+  // screen) rather than the fully unfiltered household calendar — an adult
+  // (the household manager) still defaults to "All" since seeing everyone,
+  // including the other adult's private events, is the point for them.
+  let person = explicitPerson ?? "all";
+  if (!explicitPerson) {
+    const activeMember = await getActiveMember(familyMembers);
+    if (activeMember && !effectiveIsAdult(activeMember)) {
+      person = activeMember.id;
+    }
+  }
 
   function buildHref(overrides: { view?: ScheduleViewMode; date?: Date; person?: string }) {
     const params = new URLSearchParams({

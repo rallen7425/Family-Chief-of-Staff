@@ -7,12 +7,19 @@ import { toggleTaskComplete } from "@/lib/actions/entries";
 interface TodoCheckboxProps {
   id: string;
   completed: boolean;
+  /** Fires synchronously on click, before the server round-trip — lets a
+   * parent list apply an optimistic update immediately (see
+   * NeedsDoingList, which freezes its list against the server's
+   * incomplete-only refetch so a checked item shows struck-through instead
+   * of instantly disappearing, matching the full /todo page). */
+  onToggle?: (nextCompleted: boolean) => void;
 }
 
-export function TodoCheckbox({ id, completed }: TodoCheckboxProps) {
+export function TodoCheckbox({ id, completed, onToggle }: TodoCheckboxProps) {
   const [isPending, startTransition] = useTransition();
 
   function handleClick() {
+    onToggle?.(!completed);
     startTransition(() => toggleTaskComplete(id, !completed));
   }
 

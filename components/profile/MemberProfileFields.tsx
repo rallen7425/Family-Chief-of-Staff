@@ -36,6 +36,11 @@ export function MemberProfileFields({
 }) {
   const canEditIdentity = mode === "manage";
   const isChild = !effectiveIsAdult(member);
+  // A kid's birthday is trust-sensitive (it drives the adult/child split
+  // itself) so it's parent/HoH-only, edited from Manage Family. An adult's
+  // own birthday carries no such risk — they can set it on their own My
+  // Profile too, not just when a HoH is managing them from Manage Family.
+  const canEditBirthday = canEditIdentity || !isChild;
   const age = ageInYears(member.birthday ?? null);
 
   return (
@@ -55,7 +60,7 @@ export function MemberProfileFields({
         onSave={(v) => updateProfileFields(member.id, { relationship: v })}
       />
 
-      {canEditIdentity ? (
+      {canEditBirthday ? (
         <BirthdayField member={member} />
       ) : (
         <div>

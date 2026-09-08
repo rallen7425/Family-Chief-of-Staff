@@ -157,7 +157,7 @@ export async function executeQuerySchedule(rawInput: unknown, familyMembers: Fam
       title: todo.title,
       person: familyMembers.find((m) => m.id === todo.familyMemberId)?.name ?? null,
       due_date: todo.dueDate ?? null,
-      completed: todo.completed,
+      completed: Boolean(todo.completedAt),
       status: todo.status,
       source: describeSource(todo.sourceType, todo.sourceDetail),
     })),

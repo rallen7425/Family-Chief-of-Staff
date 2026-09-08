@@ -5,7 +5,7 @@ import { getActionsSoon, getActiveAdvisories, getPendingReviewEvents } from "@/l
 import { getPendingReviewTodos, getUrgentTodos } from "@/lib/data/todos";
 import { getActiveKeepInMindItems } from "@/lib/data/keepInMind";
 import { getNotificationDismissals } from "@/lib/data/notifications";
-import type { CalendarEvent, KeepInMindItem, Todo } from "@/lib/types";
+import type { CalendarEvent, KeepInMindItem } from "@/lib/types";
 
 /**
  * The notification model. Nothing is stored — a `Notification` is derived at
@@ -31,6 +31,13 @@ export interface Notification {
   detail?: string;
   /** Omitted for rows that don't navigate (system notes expand in place). */
   href?: string;
+  /** The backing entry, when there is a single concrete one (advisory,
+   * action-soon event, deadline task) — lets the row open that entry's own
+   * EntryDetailsModal (owner, category, additional context, visible to,
+   * history, edit) instead of only navigating to a generic list page.
+   * Absent for the aggregate review nudge and free-text system notes,
+   * which have no single entry to show. */
+  entry?: CalendarEvent;
   /** Epoch ms — ranking sort key (how soon / how recent). */
   at: number;
   /** Epoch ms — hidden once `now` passes this. */
@@ -89,6 +96,7 @@ export function buildAdvisoryNotification(a: CalendarEvent, now: Date): Notifica
     title: a.title,
     detail: a.location,
     href: dayHref(a.startsAt),
+    entry: a,
     // Rank on when the advisory *applies*, not when it was detected — an
     // advisory for a future day sits mid-pack; one already in effect gets
     // the same urgency bump as anything else happening now.
@@ -111,13 +119,14 @@ export function buildActionSoonNotification(e: CalendarEvent): Notification {
     title: e.title,
     detail: [when, e.location].filter(Boolean).join(" · "),
     href: dayHref(e.startsAt),
+    entry: e,
     at: trigger,
     expiresAt: new Date(e.endsAt ?? e.startsAt).getTime(),
     dismissible: true,
   };
 }
 
-export function buildDeadlineNotification(t: Todo, now: Date): Notification {
+export function buildDeadlineNotification(t: CalendarEvent, now: Date): Notification {
   const today = householdDay(now);
   const overdue = Boolean(t.dueDate && t.dueDate < today);
   return {
@@ -131,6 +140,7 @@ export function buildDeadlineNotification(t: Todo, now: Date): Notification {
         : "Due today"
       : undefined,
     href: "/todo",
+    entry: t,
     at: t.dueDate ? new Date(`${t.dueDate}T00:00:00`).getTime() : now.getTime(),
     expiresAt: FAR_FUTURE, // stays until the task is completed (which removes it from the source)
     dismissible: true,
@@ -184,7 +194,7 @@ export interface NotificationSources {
   pendingCount: number;
   advisories: CalendarEvent[];
   actionsSoon: CalendarEvent[];
-  urgentTodos: Todo[];
+  urgentTodos: CalendarEvent[];
   systemItems: KeepInMindItem[];
   dismissed: Set<string>;
 }

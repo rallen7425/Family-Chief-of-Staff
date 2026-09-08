@@ -1,10 +1,12 @@
 import { getTodos } from "@/lib/data/todos";
+import { getLinkableOptions } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { PersonFilter } from "@/components/shared/PersonFilter";
 import { TodoList } from "@/components/todos/TodoList";
 import { AddEntryDialog } from "@/components/entries/AddEntryDialog";
+import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +14,12 @@ export default async function TodoPage(props: PageProps<"/todo">) {
   const searchParams = await props.searchParams;
   const person = typeof searchParams.person === "string" ? searchParams.person : "all";
 
-  const [todos, familyMembers, arrivalRules, activitiesByMember] = await Promise.all([
+  const [todos, familyMembers, arrivalRules, activitiesByMember, linkables] = await Promise.all([
     getTodos(person),
     getFamilyMembers(),
     getArrivalBufferRules(),
     getActivitiesByMember(),
+    getLinkableOptions(),
   ]);
 
   return (
@@ -38,7 +41,13 @@ export default async function TodoPage(props: PageProps<"/todo">) {
         buildHref={(personId) => `/todo?person=${personId}`}
       />
 
-      <TodoList todos={todos} familyMembers={familyMembers} />
+      <EntryEditingProvider
+        arrivalRules={arrivalRules}
+        linkables={linkables}
+        activitiesByMember={activitiesByMember}
+      >
+        <TodoList todos={todos} familyMembers={familyMembers} />
+      </EntryEditingProvider>
     </>
   );
 }

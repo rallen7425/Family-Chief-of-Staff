@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { KeepInMindSystemRow } from "@/components/today/KeepInMindSystemRow";
+import { KeepInMindEntryRow } from "@/components/today/KeepInMindEntryRow";
 import { SEVERITY_DOT } from "@/components/notifications/severity";
 import type { RankedNotifications } from "@/lib/notifications";
+import type { FamilyMember } from "@/lib/types";
 
 /**
  * "Notifications" — a deliberately condensed strip on the Today screen. Shows
@@ -11,7 +13,13 @@ import type { RankedNotifications } from "@/lib/notifications";
  * "View all →" (/notifications). Kept short on purpose so the Schedule card
  * and at least its first item stay visible on a phone.
  */
-export function KeepInMindCard({ notifications }: { notifications: RankedNotifications }) {
+export function KeepInMindCard({
+  notifications,
+  familyMembers,
+}: {
+  notifications: RankedNotifications;
+  familyMembers: FamilyMember[];
+}) {
   const { reviewNudge, important, more, total } = notifications;
   const rows = [...(reviewNudge ? [reviewNudge] : []), ...important];
   const hiddenCount = more.length;
@@ -36,6 +44,17 @@ export function KeepInMindCard({ notifications }: { notifications: RankedNotific
               if (n.kind === "system") {
                 return (
                   <KeepInMindSystemRow key={n.id} body={n.title} dotClass={SEVERITY_DOT[n.severity]} />
+                );
+              }
+              if (n.entry) {
+                return (
+                  <KeepInMindEntryRow
+                    key={n.id}
+                    title={n.title}
+                    entry={n.entry}
+                    dotClass={SEVERITY_DOT[n.severity]}
+                    familyMembers={familyMembers}
+                  />
                 );
               }
               return (

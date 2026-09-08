@@ -1,9 +1,11 @@
-import type { FamilyMember, Todo } from "@/lib/types";
+import type { CalendarEvent, FamilyMember } from "@/lib/types";
 import { ACCENT_HEX } from "@/lib/colors";
 import { TodoCheckbox } from "@/components/todos/TodoCheckbox";
+import { EventRow } from "@/components/events/EventRow";
+import { UnconfirmedTag } from "@/components/events/UnconfirmedTag";
 
 interface TodoListProps {
-  todos: Todo[];
+  todos: CalendarEvent[];
   familyMembers: FamilyMember[];
 }
 
@@ -23,24 +25,23 @@ export function TodoList({ todos, familyMembers }: TodoListProps) {
       <div className="flex flex-col gap-5">
         {todos.map((todo) => {
           const member = todo.familyMemberId ? memberById.get(todo.familyMemberId) : undefined;
+          const completed = Boolean(todo.completedAt);
           return (
-            <div key={todo.id} className={`flex items-center gap-4 ${todo.completed ? "opacity-60" : ""}`}>
-              <TodoCheckbox id={todo.id} completed={todo.completed} />
-              <div className="flex-1">
-                <span
-                  className={`text-[16px] font-medium ${
-                    todo.completed ? "text-muted-label line-through decoration-muted-label/50" : "text-ink"
-                  }`}
-                >
-                  {todo.title}
-                </span>
-                {todo.status === "pending_review" && (
-                  <span className="ml-2 text-[11px] font-semibold text-primary uppercase tracking-wide">
-                    Needs review
+            <div key={todo.id} className={`flex items-center gap-4 ${completed ? "opacity-60" : ""}`}>
+              <TodoCheckbox id={todo.id} completed={completed} />
+              <div className="flex-1 min-w-0">
+                <EventRow event={todo} familyMembers={familyMembers}>
+                  <span
+                    className={`text-[16px] font-medium ${
+                      completed ? "text-muted-label line-through decoration-muted-label/50" : "text-ink"
+                    }`}
+                  >
+                    {todo.title}
                   </span>
-                )}
+                  <UnconfirmedTag status={todo.status} className="ml-2 align-middle" />
+                </EventRow>
               </div>
-              {member && !todo.completed && (
+              {member && !completed && (
                 <div
                   className="w-2 h-2 rounded-full shrink-0"
                   style={{ background: ACCENT_HEX[member.accentColor] }}

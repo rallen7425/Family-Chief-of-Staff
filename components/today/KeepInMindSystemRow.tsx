@@ -8,7 +8,9 @@ import { useState } from "react";
  * carries `body` — so tapping toggles an inline panel that shows the full,
  * untruncated `body` beneath the row. For a short body that already fits on
  * one line the panel just repeats it; that's expected (see the Today
- * prototype). Todo and review rows navigate instead and stay server-rendered.
+ * prototype). Rows backed by a real entry open that entry's details modal
+ * instead (see KeepInMindEntryRow); only the aggregate review nudge still
+ * navigates, to /review.
  */
 export function KeepInMindSystemRow({
   body,

@@ -11,7 +11,7 @@ import {
   type Notification,
   type NotificationSources,
 } from "@/lib/notifications";
-import type { CalendarEvent, KeepInMindItem, Todo } from "@/lib/types";
+import type { CalendarEvent, KeepInMindItem } from "@/lib/types";
 
 // 2026-08-29 14:00 America/New_York — household "today" is 2026-08-29.
 const NOW = new Date("2026-08-29T18:00:00.000Z");
@@ -36,18 +36,8 @@ function mkEvent(over: Partial<CalendarEvent> = {}): CalendarEvent {
     ...over,
   };
 }
-function mkTodo(over: Partial<Todo> = {}): Todo {
-  return {
-    id: "t1",
-    title: "Return the form",
-    familyMemberId: null,
-    ownerMemberIds: [],
-    completed: false,
-    isCritical: false,
-    status: "confirmed",
-    sourceType: "manual",
-    ...over,
-  };
+function mkTodo(over: Partial<CalendarEvent> = {}): CalendarEvent {
+  return mkEvent({ id: "t1", title: "Return the form", kind: "task", ...over });
 }
 function mkKim(over: Partial<KeepInMindItem> = {}): KeepInMindItem {
   return { id: "k1", body: "Rain after 3pm", icon: "weather", familyMemberId: null, dismissed: false, ...over };

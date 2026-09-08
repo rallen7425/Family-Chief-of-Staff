@@ -1,16 +1,28 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getRankedNotifications } from "@/lib/notifications";
+import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getActivitiesByMember } from "@/lib/data/memberDetails";
+import { getLinkableOptions } from "@/lib/data/events";
 import { NotificationRow } from "@/components/notifications/NotificationRow";
+import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const { reviewNudge, important, more } = await getRankedNotifications();
+  const [{ reviewNudge, important, more }, familyMembers, arrivalRules, activitiesByMember, linkables] =
+    await Promise.all([
+      getRankedNotifications(),
+      getFamilyMembers(),
+      getArrivalBufferRules(),
+      getActivitiesByMember(),
+      getLinkableOptions(),
+    ]);
   const isEmpty = !reviewNudge && important.length === 0 && more.length === 0;
 
   return (
-    <>
+    <EntryEditingProvider arrivalRules={arrivalRules} linkables={linkables} activitiesByMember={activitiesByMember}>
       <h1 className="font-display font-semibold text-[28px] leading-tight text-ink">Notifications</h1>
 
       {isEmpty && (
@@ -41,7 +53,7 @@ export default async function NotificationsPage() {
           <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase mb-3">Important</h2>
           <div className="flex flex-col gap-3.5">
             {important.map((n) => (
-              <NotificationRow key={n.id} n={n} />
+              <NotificationRow key={n.id} n={n} familyMembers={familyMembers} />
             ))}
           </div>
         </section>
@@ -52,11 +64,11 @@ export default async function NotificationsPage() {
           <h2 className="text-[12px] font-bold tracking-widest text-muted-text uppercase mb-3">More</h2>
           <div className="flex flex-col gap-3.5">
             {more.map((n) => (
-              <NotificationRow key={n.id} n={n} />
+              <NotificationRow key={n.id} n={n} familyMembers={familyMembers} />
             ))}
           </div>
         </section>
       )}
-    </>
+    </EntryEditingProvider>
   );
 }

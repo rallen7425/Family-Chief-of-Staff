@@ -16,25 +16,25 @@ import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
+  const familyMembers = await getFamilyMembers();
+  const activeMember = await getActiveMember(familyMembers);
+
   const [
     notifications,
     schedulePreview,
     todos,
-    familyMembers,
     arrivalRules,
     linkables,
     activitiesByMember,
   ] = await Promise.all([
     getRankedNotifications(),
-    getTodaySchedulePreview(),
+    getTodaySchedulePreview(activeMember?.id),
     getIncompleteTodos(3),
-    getFamilyMembers(),
     getArrivalBufferRules(),
     getLinkableOptions(),
     getActivitiesByMember(),
   ]);
 
-  const activeMember = await getActiveMember(familyMembers);
   const rightNowChore = activeMember ? await getRightNowChore(activeMember) : null;
 
   return (
@@ -46,15 +46,15 @@ export default async function TodayPage() {
         <h1 className="font-display font-semibold text-[32px] leading-tight text-ink">Today</h1>
       </div>
       {activeMember && <RightNowCard chore={rightNowChore} member={activeMember} />}
-      <KeepInMindCard notifications={notifications} />
       <EntryEditingProvider
         arrivalRules={arrivalRules}
         linkables={linkables}
         activitiesByMember={activitiesByMember}
       >
+        <KeepInMindCard notifications={notifications} familyMembers={familyMembers} />
         <ScheduleCard preview={schedulePreview} familyMembers={familyMembers} />
+        <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
       </EntryEditingProvider>
-      <NeedsDoingCard todos={todos} familyMembers={familyMembers} />
     </>
   );
 }

@@ -71,25 +71,46 @@ export default async function ConnectedAccountsPage() {
               <p className="text-[12.5px] text-muted-label pl-10">Not connected</p>
             ) : (
               memberConnections.map((c) => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full bg-mist flex items-center justify-center shrink-0">
-                    <Mail size={15} className="text-muted-text" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13.5px] font-semibold text-ink truncate">
-                      {c.externalAccountEmail}
-                    </p>
-                    <p className="text-[12px] text-muted-label">
-                      Gmail
-                      {c.lastSyncedAt &&
-                        ` — last synced ${formatDistanceToNow(new Date(c.lastSyncedAt), { addSuffix: true })}`}
-                    </p>
+                <div key={c.id} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full bg-mist flex items-center justify-center shrink-0">
+                      <Mail size={15} className="text-muted-text" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13.5px] font-semibold text-ink truncate">
+                        {c.externalAccountEmail}
+                      </p>
+                      <p className="text-[12px] text-muted-label">
+                        Gmail
+                        {c.lastSyncedAt &&
+                          ` — last synced ${formatDistanceToNow(new Date(c.lastSyncedAt), { addSuffix: true })}`}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10.5px] font-bold uppercase tracking-wide rounded-pill px-2 py-0.5 shrink-0 ${STATUS_CLASS[c.status]}`}
+                    >
+                      {STATUS_LABEL[c.status]}
+                    </span>
                   </div>
-                  <span
-                    className={`text-[10.5px] font-bold uppercase tracking-wide rounded-pill px-2 py-0.5 shrink-0 ${STATUS_CLASS[c.status]}`}
-                  >
-                    {STATUS_LABEL[c.status]}
-                  </span>
+                  {c.status === "needs_reconnect" && (
+                    <div className="pl-10 flex items-center justify-between gap-2">
+                      {c.lastError && (
+                        <p className="text-[11.5px] text-accent-berry leading-relaxed">{c.lastError}</p>
+                      )}
+                      {m.id === activeMember.id ? (
+                        <a
+                          href="/api/connectors/google/start"
+                          className="text-[12px] font-semibold text-primary shrink-0"
+                        >
+                          Reconnect
+                        </a>
+                      ) : (
+                        <p className="text-[11.5px] text-muted-label shrink-0">
+                          Ask {m.name} to reconnect from their Profile
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}

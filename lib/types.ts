@@ -136,6 +136,9 @@ export interface CalendarEvent {
   /** Set for kind `task` (this shape is reused for the review queue, which
    * mixes all four kinds). YYYY-MM-DD. */
   dueDate?: string;
+  /** Set for kind `task` once marked done (ISO datetime). Undefined = not
+   * completed. */
+  completedAt?: string;
   allDay: boolean;
   location?: string;
   locationLat?: number;

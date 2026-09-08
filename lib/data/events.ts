@@ -16,7 +16,7 @@ type EntryRowWithOwners = EntryRow & { entry_owners: { family_member_id: string 
 
 const SELECT_WITH_OWNERS = "*, entry_owners(family_member_id)";
 
-function mapEvent(row: EntryRowWithOwners): CalendarEvent {
+export function mapEvent(row: EntryRowWithOwners): CalendarEvent {
   return {
     id: row.id,
     title: row.title,
@@ -29,6 +29,7 @@ function mapEvent(row: EntryRowWithOwners): CalendarEvent {
     startsAt: row.starts_at ?? row.created_at,
     endsAt: row.ends_at ?? undefined,
     dueDate: row.due_at ?? undefined,
+    completedAt: row.completed_at ?? undefined,
     allDay: row.is_all_day,
     location: row.location_text ?? undefined,
     locationLat: row.location_lat ?? undefined,
@@ -105,8 +106,17 @@ export async function getEventsInRange(
  * forward one day when today is light (see `buildSchedulePreview`). Queries
  * a 3-day window so the "nothing for the next two days" case can be
  * detected. Server TZ is pinned in instrumentation.ts, so the day math is
- * household-local. */
-export async function getTodaySchedulePreview(): Promise<SchedulePreview> {
+ * household-local.
+ *
+ * `viewerId` — the active member per Switch Account/lock screen — applies
+ * the same visibility rule as the person-filtered `/schedule` view (an
+ * adult's own event stays private, a kid's event shows for that kid + every
+ * adult), except a whole-family entry (no subject) stays visible to
+ * everyone here rather than being excluded: this is "what should this
+ * viewer's own Today screen show," not "filter down to just this person's
+ * assigned items." Omitting it keeps the fully unfiltered household view
+ * (no active member resolved, or a caller with no viewer concept). */
+export async function getTodaySchedulePreview(viewerId?: string | null): Promise<SchedulePreview> {
   const now = new Date();
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -120,7 +130,16 @@ export async function getTodaySchedulePreview(): Promise<SchedulePreview> {
     .order("starts_at")
     .returns<EntryRowWithOwners[]>();
   if (error) throw error;
-  return buildSchedulePreview(attachReminders(data.map(mapEvent)), now);
+  let events = data.map(mapEvent);
+
+  if (viewerId) {
+    const familyMembers = await getFamilyMembers();
+    events = events.filter(
+      (event) => !event.familyMemberId || isEventVisibleToViewer(event, viewerId, familyMembers)
+    );
+  }
+
+  return buildSchedulePreview(attachReminders(events), now);
 }
 
 /** Confirmed advisories, for the notifications feed. Time-bounding (show
