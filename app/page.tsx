@@ -5,9 +5,12 @@ import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { getRankedNotifications } from "@/lib/notifications";
+import { getActiveMember } from "@/lib/activeMember";
+import { getRightNowChore } from "@/lib/rightNow";
 import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
 import { NeedsDoingCard } from "@/components/today/NeedsDoingCard";
+import { RightNowCard } from "@/components/today/RightNowCard";
 import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +34,9 @@ export default async function TodayPage() {
     getActivitiesByMember(),
   ]);
 
+  const activeMember = await getActiveMember(familyMembers);
+  const rightNowChore = activeMember ? await getRightNowChore(activeMember) : null;
+
   return (
     <>
       <div>
@@ -39,6 +45,7 @@ export default async function TodayPage() {
         </p>
         <h1 className="font-display font-semibold text-[32px] leading-tight text-ink">Today</h1>
       </div>
+      {activeMember && <RightNowCard chore={rightNowChore} member={activeMember} />}
       <KeepInMindCard notifications={notifications} />
       <EntryEditingProvider
         arrivalRules={arrivalRules}

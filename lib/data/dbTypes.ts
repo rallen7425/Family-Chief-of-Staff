@@ -1,4 +1,12 @@
-import type { AccentColor, EntryKind, ItemStatus, SourceDetail, SourceType } from "@/lib/types";
+import type {
+  AccentColor,
+  ChoreFrequency,
+  ChoreTimeWindow,
+  EntryKind,
+  ItemStatus,
+  SourceDetail,
+  SourceType,
+} from "@/lib/types";
 
 /** Row shapes as they come back from Supabase (snake_case) — see the
  * `family_chief_of_staff` schema migration in rocky-coast-labs/supabase/migrations/. */
@@ -118,4 +126,66 @@ export interface EmailConnectionRow {
   last_error: string | null;
   connected_at: string;
   updated_at: string;
+}
+
+// ── Gamified chore list ─────────────────────────────────────────────────
+
+export interface ChoreRow {
+  id: string;
+  title: string;
+  points: number;
+  frequency: ChoreFrequency;
+  frequency_days: number[] | null;
+  deadline_time: string | null;
+  time_window: ChoreTimeWindow;
+  is_pinned: boolean;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ChoreAssigneeRow {
+  chore_id: string;
+  family_member_id: string;
+}
+
+export interface ChoreCompletionRow {
+  id: string;
+  chore_id: string;
+  family_member_id: string;
+  completed_on: string;
+  status: "complete" | "partial";
+  points_awarded: number;
+  completed_at: string;
+}
+
+export interface MemberPointsRow {
+  family_member_id: string;
+  balance: number;
+  current_streak: number;
+  longest_streak: number;
+  last_completed_on: string | null;
+}
+
+export interface GoalRow {
+  id: string;
+  name: string;
+  points_needed: number;
+  needs_approval: boolean;
+  active: boolean;
+  created_at: string;
+}
+
+export interface GoalAvailabilityRow {
+  goal_id: string;
+  family_member_id: string;
+}
+
+export interface GoalClaimRow {
+  id: string;
+  goal_id: string;
+  family_member_id: string;
+  points_spent: number;
+  status: "pending" | "achieved" | "denied";
+  requested_at: string;
+  resolved_at: string | null;
 }

@@ -217,3 +217,81 @@ export interface KeepInMindItem {
 }
 
 export type ScheduleViewMode = "day" | "3day" | "week" | "month";
+
+// ── Gamified chore list ─────────────────────────────────────────────────
+
+export type ChoreFrequency = "one_time" | "daily" | "weekly" | "custom";
+export type ChoreTimeWindow = "before_school" | "after_school" | "evening" | "anytime";
+
+export interface Chore {
+  id: string;
+  title: string;
+  points: number;
+  frequency: ChoreFrequency;
+  /** weekly/custom only: 0=Sun..6=Sat. */
+  frequencyDays?: number[] | null;
+  /** "HH:MM" household-local, optional. */
+  deadlineTime?: string | null;
+  timeWindow: ChoreTimeWindow;
+  /** Wins the Right Now tie-break when more than one chore is eligible. */
+  isPinned: boolean;
+  active: boolean;
+  assigneeMemberIds: string[];
+  createdAt: string;
+}
+
+export interface ChoreCompletion {
+  id: string;
+  choreId: string;
+  familyMemberId: string;
+  /** YYYY-MM-DD — the occurrence date, for recurring chores. */
+  completedOn: string;
+  status: "complete" | "partial";
+  /** Stored per-row so a later change to the chore's point value doesn't
+   * rewrite history. */
+  pointsAwarded: number;
+  completedAt: string;
+}
+
+/** Maintained balance/streak cache — one row per member, updated
+ * transactionally alongside chore_completions/goal_claims writes. */
+export interface MemberPoints {
+  familyMemberId: string;
+  balance: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedOn?: string | null;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  pointsNeeded: number;
+  /** A parent must mark a claim "achieved" before it counts — since they
+   * have to actually deliver it. False = counted the instant it's claimed. */
+  needsApproval: boolean;
+  active: boolean;
+  /** Empty = available to every kid. */
+  availableMemberIds: string[];
+  createdAt: string;
+}
+
+export interface GoalClaim {
+  id: string;
+  goalId: string;
+  familyMemberId: string;
+  /** Debited from the member's balance at claim time, not at approval. */
+  pointsSpent: number;
+  status: "pending" | "achieved" | "denied";
+  requestedAt: string;
+  resolvedAt?: string | null;
+}
+
+/** The single Right Now card's contents — see lib/rightNow.ts. */
+export interface RightNowChore {
+  choreId: string;
+  title: string;
+  points: number;
+  timeWindow: ChoreTimeWindow;
+  deadlineTime?: string | null;
+}
