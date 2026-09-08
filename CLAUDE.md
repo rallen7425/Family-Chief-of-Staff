@@ -15,6 +15,100 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-08) — Gamified Chore List: full build, P0–P3 (DEPLOYED — paused for on-device testing)
+
+Read `gamified-chore-list-implementation-prompt.md` (+ `gamified-chore-list-plan.md`
+decision record, + the 12-artboard canvas at `design/mockups/gamified-chore-list-prototype.html`)
+and built the whole thing in one pass — all four rollout phases, not just P0. **Merged
+straight to `main` (no branch), pushed, and deployed.** Paused for the user to test on a
+real phone rather than continuing further.
+
+### State right now
+
+| | |
+|---|---|
+| **Production** | Deployed via `vercel --prod` (`dpl_ArDB49ZcEvTe4R4YaW7WDnkGd87U`, aliased `family-chief-of-staff.vercel.app`). All `/chores*` routes + `/` smoke-checked 200 live. |
+| **`family-chief-of-staff`** | `main` @ `e815d2e`, pushed. |
+| **`rocky-coast-labs`** | `main` @ `5a85f38` — migration `20260908000001_family_chief_of_staff_chores.sql` applied to the shared DB and pushed. |
+| **Checks** | `tsc` / eslint / **178 tests** (19 new) / `next build` all green. |
+| **Live data** | `chores` / `goals` / `chore_completions` / `goal_claims` / `member_points` are all empty in production — only throwaway rows were written during verification, all confirmed deleted afterward. The user chose to create real chores/goals themselves via the UI rather than have seed data written for them. |
+
+### What it adds
+
+- **Schema**: `chores` (frequency `one_time`/`daily`/`weekly`/`custom` + `frequency_days`,
+  `deadline_time`, `time_window` `before_school`/`after_school`/`evening`/`anytime`,
+  `is_pinned`), `chore_assignees`, `chore_completions` (`points_awarded` stored per-row,
+  not derived), `member_points` (maintained balance/streak cache), `goals`
+  (`needs_approval`), `goal_availability` (empty = all kids), `goal_claims`.
+- **`lib/chores.ts`** — the single bookkeeping/logic module: `completeChore` /
+  `claimGoal` / `resolveGoalClaim` (sequential-write "transactions", same pattern
+  `createEntry`/`syncOwners` already uses — no Postgres RPC precedent existed in this
+  codebase to reach for instead) + pure occurrence/ranking logic
+  (`choreOccursOn`/`occurrencesToday`/`todaysOccurrences`, `isEligibleTimeWindow`,
+  `isSchoolHours`, `pickRightNowChore`, `crossedMilestone`) shared by Today's Chores
+  and the Right Now card so balance/streak math can't fork between call sites.
+- **`lib/rightNow.ts`** — `getRightNowChore(member, now)`: adults never see it; suppressed
+  during fixed school hours (weekdays 7a–3p, a hardcoded constant per the plan doc, not
+  schema-backed); suppressed while the kid is inside a scheduled `entries` event
+  (respecting its `arrival_at` buffer if set, else just its start→end); otherwise picks
+  by pinned → nearest deadline → highest points among chores eligible for the current
+  time-of-day bucket. Wired into `app/page.tsx` above `KeepInMindCard`; renders nothing
+  (not an empty state) when nothing qualifies.
+- **New `/chores` tree**: `/chores` (Parent Dashboard incl. weekly-summary strip +
+  per-kid streak/points/completion-ratio + full chore list, or Today's Chores for a
+  kid — same route, branches on `effectiveIsAdult`), `/chores/builder[/[choreId]]`
+  (parent-only, redirects a kid who lands there directly), `/chores/progress` (level
+  ring, weekly bar chart, 5 hardcoded milestone badges), `/chores/leaderboard`,
+  `/chores/goals` (child claim flow / parent approval queue + catalog, same
+  branch-on-role pattern), `/chores/goals/new`, `/chores/goals/[goalId]`. New "Chores"
+  nav pill in `TabPillRow`. Reuses `MultiOwnerPicker` (assign-to / available-to),
+  `TimePickerButton` (deadline), and the app's existing toggle-switch/stepper/Danger
+  Zone visual patterns rather than inventing new ones.
+- **Celebration modal** (`components/chores/CelebrationModal.tsx`) fires from both
+  completion call sites when `completeChoreAction`'s result carries `milestoneHit`
+  (every 5-day streak or 100-point balance boundary) — computed in the same write path
+  that updates `member_points`, so it can't drift out of sync with the real numbers.
+- **Judgment calls made, not left ambiguous**: Leaderboard and My Progress's weekly
+  chart both rank/plot on **points earned in the last 7 days** (the plan doc's one open
+  question — matches what the mockups show). Goal deletion is **blocked** (not
+  cascaded) while a pending claim references it. A `weekly`/`custom` chore both get the
+  day-picker (the prompt's DB comment said "weekly/custom only" for `frequency_days`
+  even though its prose only mentioned Custom revealing the picker).
+
+### Verified
+
+`lib/chores.test.ts` (19 new unit tests) covers the pure ranking/occurrence/milestone
+logic. Beyond that, ran real read/write flows directly against the live production
+database via `tsx` (not just UI smoke checks), then deleted every row and confirmed
+empty afterward: chore creation → assignee lookup → Right Now correctly suppressed
+during a simulated school-hours instant and correctly surfaced at a simulated evening
+instant → completion → balance/streak update → Right Now correctly disappears once
+nothing's left eligible; goal claim → balance debited immediately → a second claim
+against the now-insufficient balance rejected → deny → exact refund → resolving an
+already-resolved claim rejected; delete-goal-with-a-pending-claim rejected, then
+succeeds once the claim's gone.
+
+### RESUME HERE — pending on-device verification
+
+The user is testing on a real phone before continuing. Checklist handed to them:
+create a chore of each frequency/time-window/deadline/pin combination, edit and delete
+one, add a Goal with each availability/approval combination, and — switched to Ben or
+Nora via Settings → Switch Account — complete a chore (full + partial credit), check
+My Progress/Leaderboard agree with each other, claim a Goal end-to-end. Also unrelated
+and still separately open from the 2026-09-07 session below: the Gmail reconnect click
+on `/profile` for `rallen7425@gmail.com` — the user said they'd do it "while they're at
+it" but hadn't confirmed completion when this session paused. Once they do, the
+verification step is a single curl: see the 2026-09-07 section's step 3.
+
+### Deferred / out of scope this round
+
+Per the implementation prompt's own §6: real per-kid device auth (still just the
+existing `fcos_active_member` cookie), a generic/extensible badges engine, any change
+to `arrival_buffer_rules`/entries/events (Right Now only reads that data), push
+notifications, per-kid school-hours customization.
+
+---
+
 ## Session status (2026-09-07) — Email/Calendar Connectors: review, plan, Phase 0 + Phase 1 (DEPLOYED — paused for one manual reconnect click)
 
 Two threads: (1) fixed the Gmail-scan cron failure carried over from
