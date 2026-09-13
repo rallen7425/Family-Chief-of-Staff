@@ -221,11 +221,25 @@ afterward. `tsc`/eslint/178 tests/build all green throughout.
 
 ### RESUME HERE — Phase 5 next (invite/join flow), pending user go-ahead
 
-Still open, blocking Phase 5: outbound transactional email provider (needed for real invite
-sending), the join-mechanism split (code vs. link — the plan doc already proposes an answer, needs
-confirming). Still open more generally: `LockScreen`'s fate, whether to wire up Distilled as a
-second consumer. The Phase 2 manual GCP/Supabase-dashboard step (Google sign-in) remains outstanding
-and independent of everything above.
+**Outbound email decided**: Supabase's built-in `supabase.auth.admin.inviteUserByEmail()`, not a
+third-party provider (Resend/Postmark) — it's the mechanism Supabase Auth already ships specifically
+for "create an invited user and email them a link to complete signup," which is exactly Stage E's
+job for both invite types (`new_adult`: invite directly; `activate_member`: invite, then link the
+resulting `auth_user_id` to the existing profile-only `family_members` row on acceptance). No new
+provider account, API key, or package. Rejected a dedicated provider as infrastructure ahead of
+proven need — same reasoning as the GCP-topology and Microsoft-sign-in decisions. **Not yet
+verified that this project's Supabase SMTP actually delivers** — sign-up testing so far never
+exercised it (email confirmation is off, so no email was ever sent). Check the project's mail
+settings before relying on it, and when ready to verify real delivery, send one test invite to an
+inbox the user actually controls — not something to fire off without their awareness, since it's a
+real outbound email, unlike the throwaway `*.test`-domain accounts used everywhere else so far.
+
+Join-mechanism split (code for `activate_member`, link/email for `new_adult`) already resolved in
+the plan doc — no re-decision needed, just confirm at build time.
+
+Still open more generally: `LockScreen`'s fate, whether to wire up Distilled as a second consumer.
+The Phase 2 manual GCP/Supabase-dashboard step (Google sign-in) remains outstanding and independent
+of everything above.
 
 ---
 
