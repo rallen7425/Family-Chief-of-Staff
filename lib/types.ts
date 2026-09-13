@@ -49,6 +49,12 @@ export interface FamilyMember {
   /** Shown on Edit Member for computed children only. */
   school?: string;
   grade?: string;
+  /** New as of the Identity/Sign-In/Onboarding pass (2026-09-12) — every
+   * member belongs to a household. Only actually read by onboarding's own
+   * screens so far (deriving "which household is this signup for" from
+   * the session's own linked row); the rest of the app doesn't filter by
+   * it yet (see CLAUDE.md's 2026-09-12 note on the accepted scope). */
+  householdId: string;
 }
 
 /** Display-only view of an `email_connections` row — never carries a token,

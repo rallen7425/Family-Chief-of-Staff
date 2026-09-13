@@ -29,6 +29,14 @@ export interface FamilyMemberInput {
   phone: string | null;
   school: string | null;
   grade: string | null;
+  /** Set only when creating a member as part of onboarding a *new*
+   * household (lib/actions/onboarding.ts) — every other caller (the
+   * existing "Add family member" flow) omits this and gets the DB's
+   * default-to-the-one-real-household value, per the Identity/Onboarding
+   * pass's accepted scope (see CLAUDE.md's 2026-09-12 note: query-scoping
+   * the rest of the app is deferred, but a NEW household's own members
+   * must never be silently attached to the wrong household at write time). */
+  householdId?: string;
 }
 
 function validate(input: FamilyMemberInput): string | null {
@@ -91,9 +99,11 @@ export async function saveFamilyMember(
       .limit(1)
       .maybeSingle();
     const nextOrder = (last?.sort_order ?? -1) + 1;
-    const { error } = await supabase
-      .from("family_members")
-      .insert({ ...toRow(input, isAdult), sort_order: nextOrder });
+    const { error } = await supabase.from("family_members").insert({
+      ...toRow(input, isAdult),
+      sort_order: nextOrder,
+      ...(input.householdId ? { household_id: input.householdId } : {}),
+    });
     if (error) return { error: error.message };
   }
   revalidateProfileViews();

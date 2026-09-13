@@ -6,7 +6,7 @@ import {
 } from "@/lib/visibility";
 import type { FamilyMember } from "@/lib/types";
 
-const hoh = { isHeadOfHousehold: false };
+const hoh = { isHeadOfHousehold: false, householdId: "test-household" };
 const rick: FamilyMember = { id: "rick", name: "Rick", accentColor: "coral", isAdult: true, ...hoh };
 const kim: FamilyMember = { id: "kim", name: "Kim", accentColor: "teal", isAdult: true, ...hoh };
 const ben: FamilyMember = { id: "ben", name: "Ben", accentColor: "gold", isAdult: false, ...hoh };

@@ -64,6 +64,7 @@ describe("colorInUseByOthers", () => {
     accentColor,
     isAdult: true,
     isHeadOfHousehold: false,
+    householdId: "test-household",
   });
   const members = [mk("a", "blue"), mk("b", "teal"), mk("c", "gold")];
 

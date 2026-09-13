@@ -25,6 +25,7 @@ export interface FamilyMemberRow {
   phone: string | null;
   school: string | null;
   grade: string | null;
+  household_id: string;
 }
 
 export interface MemberDetailRow {

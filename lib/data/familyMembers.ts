@@ -16,6 +16,7 @@ function mapFamilyMember(row: FamilyMemberRow): FamilyMember {
     phone: row.phone ?? undefined,
     school: row.school ?? undefined,
     grade: row.grade ?? undefined,
+    householdId: row.household_id,
   };
 }
 

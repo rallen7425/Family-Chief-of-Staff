@@ -15,7 +15,7 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phases 1–3 — IN PROGRESS, stopped for review
+## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phases 1–4 — IN PROGRESS, stopped for review
 
 Working from `identity-signin-onboarding-implementation-prompt.md` (+ `identity-signin-onboarding-plan.md`,
 `mvp-spec.md`, `design-system.md` — all repo-root, untracked, same convention as the other
@@ -159,13 +159,73 @@ API, then deleted it. Confirmed the existing app (`/`, as Rick, via the real `fc
 cookie) still renders with full chrome and real data, unaffected by the restructure. Full
 `tsc`/eslint/178 tests/`next build` clean after every step.
 
-### RESUME HERE — Phase 4 next (onboarding flow), pending user go-ahead + the Phase 2 manual step
+### Phase 4 — Onboarding flow (Stages B, C, D — manual path only)
 
-Still open, blocking later phases: `LockScreen`'s fate (retire vs. lightweight per-member re-auth
-on an already-authenticated device — now a real, live question given `/signin` exists and works),
-outbound transactional email provider for invites, whether to wire up Distilled as a second
-consumer in this same pass. The Phase 2 manual GCP/Supabase-dashboard step (above) is independent
-of starting Phase 4 — Google sign-in isn't required for onboarding itself to be buildable.
+**Scope decision made before starting** (see the implementation prompt's own §2): no query in
+`lib/data/*.ts` filters by `household_id` yet — deferred, not part of this pass. Onboarding is the
+first code to actually create a *second* real household, so the user chose explicitly: build and
+verify onboarding's own screens/writes correctly (a new household's data must never be attached to
+the wrong `household_id` at write time — that's this phase's job), but accept that the rest of the
+app (Today, Schedule, etc.) will keep showing Rick's real household's data regardless of which
+household just onboarded, until a dedicated query-scoping pass happens later. **Verified this is
+exactly what happens** — see below.
+
+- **`lib/actions/onboarding.ts`** (new) — `createProfileAndHousehold` (Stage B: creates the
+  `households` row + the account holder's own `family_members` row — `account_status: 'activated'`,
+  `auth_user_id` set, `has_approval_authority: true` alongside `is_head_of_household: true` — in one
+  step, guarded so it can never run twice for the same auth user), `setHouseholdName` (NameHousehold),
+  `addHouseholdMember` (Stage C, wraps `saveFamilyMember` with the new household's id), 
+  `setApprovalAuthority` (Stage D — exactly one holder at a time, unlike `is_head_of_household` which
+  already allows several).
+- **`lib/actions/familyMembers.ts`** — `saveFamilyMember`/`FamilyMemberInput` gained an optional
+  `householdId` — omitted by every existing caller (unchanged behavior, gets the Phase-1-follow-up
+  default), passed explicitly by onboarding so a new household's members never silently attach to
+  Rick's.
+- **`lib/data/onboarding.ts`** (new) — `getHousehold`, `getHouseholdMembers`,
+  `getApprovalAuthorityHolderId` — onboarding's *own* correctly household-scoped reads. Deliberately
+  separate from `getFamilyMembers()` (still unscoped): onboarding is brand-new code building a
+  brand-new household, so it has to get this right even though older code doesn't yet.
+- **`FamilyMember` gained `householdId`** (`lib/types.ts`, `lib/data/dbTypes.ts`,
+  `lib/data/familyMembers.ts`'s mapper) — the one field onboarding actually needs to derive "which
+  household is this for" from the session's own linked row on every step. Broke 3 test files' mock
+  builders (now-required field) — fixed by adding a fixed dummy value to each, not by making the
+  field optional.
+- **`/onboarding/profile`, `/onboarding/name-household`, `/onboarding/household`,
+  `/onboarding/permissions`** (new) — built to match the design canvas's `OnboardingProfile`,
+  `NameHousehold`, `OnboardingFamilyEmpty`/`OnboardingFamily`, `OnboardingPermissions` artboards
+  (fetched and parsed from the same published canvas artifact as Phase 3's sign-in screens).
+  Deviates from the canvas in two places, both intentional reconciliations with the *real* app: (1)
+  the add-member form uses free-text Relationship, not the canvas's chip picker — matches the
+  already-built `/family/[memberId]` pattern, per `profile-family-management-plan.md`'s own explicit
+  decision that chips were rejected as unnecessary UI weight; (2) the canvas's "Invite to create
+  login" per-roster-row action and the "Connect Gmail & Calendar" card on the profile step are both
+  **omitted**, not stubbed — the former needs the outbound-email decision (Phase 5), the latter needs
+  the existing connector flow's identity resolution reworked (it currently reads `fcos_active_member`,
+  not this new session — a real integration gap, not a UI omission).
+- **AI wizard (`OnboardingFamilyWizard`) not built** — its ambiguous-birthdate handling is an
+  explicit open decision in the implementation prompt (§6/§9), not guessed at; manual add-member
+  only, this phase.
+
+**Verified end-to-end against the real shared database, safety-critical parts especially**: signed
+up a real throwaway account through the actual UI, walked the *entire* flow (Profile → skipped
+household name → NameHousehold → added one real household member through the real modal → confirmed
+the approval-authority reassign picker renders correctly → Permissions → landed on `/`, which
+correctly shows Rick's real data per the accepted scope, not a bug). Queried the database directly
+afterward: a genuinely new, isolated `households` row was created, both new `family_members` rows
+had the *correct* new `household_id` (never Rick's), the account holder was correctly `activated`
+with the right `auth_user_id`/`has_approval_authority`/`is_head_of_household`, the added child was
+correctly `profile_only`/`auth_user_id: null` with the right relationship/birthday/computed age.
+**Confirmed Rick's real household was completely untouched throughout** (still exactly 4 members,
+same `household_id`). Deleted all test rows (household, both family_members, the auth user)
+afterward. `tsc`/eslint/178 tests/build all green throughout.
+
+### RESUME HERE — Phase 5 next (invite/join flow), pending user go-ahead
+
+Still open, blocking Phase 5: outbound transactional email provider (needed for real invite
+sending), the join-mechanism split (code vs. link — the plan doc already proposes an answer, needs
+confirming). Still open more generally: `LockScreen`'s fate, whether to wire up Distilled as a
+second consumer. The Phase 2 manual GCP/Supabase-dashboard step (Google sign-in) remains outstanding
+and independent of everything above.
 
 ---
 

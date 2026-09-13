@@ -3,8 +3,8 @@ import { extractSenderDomain, pickReminderParent, resolveByDomain, resolvePerson
 import type { FamilyMember } from "@/lib/types";
 import type { MemberEmailDomain } from "@/lib/data/memberEmailDomains";
 
-const ben: FamilyMember = { id: "ben", name: "Ben", accentColor: "gold", isAdult: false, isHeadOfHousehold: false };
-const nora: FamilyMember = { id: "nora", name: "Nora", accentColor: "berry", isAdult: false, isHeadOfHousehold: false };
+const ben: FamilyMember = { id: "ben", name: "Ben", accentColor: "gold", isAdult: false, isHeadOfHousehold: false, householdId: "test-household" };
+const nora: FamilyMember = { id: "nora", name: "Nora", accentColor: "berry", isAdult: false, isHeadOfHousehold: false, householdId: "test-household" };
 const family = [ben, nora];
 
 const domains: MemberEmailDomain[] = [
