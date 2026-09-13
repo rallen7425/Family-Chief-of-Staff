@@ -15,6 +15,78 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phase 1 (data model) — IN PROGRESS, stopped for review
+
+Working from `identity-signin-onboarding-implementation-prompt.md` (+ `identity-signin-onboarding-plan.md`,
+`mvp-spec.md`, `design-system.md` — all repo-root, untracked, same convention as the other
+`*-plan.md`/`*-implementation-prompt.md` pairs). **This is the "Auth / login — not built" workstream
+flagged in every prior session's notes below, now underway.** Multi-phase pass, stopping for review
+after each phase per the prompt's own §10 — this is Phase 1 of ~7 only.
+
+**Decisions locked in before touching live data** (see the implementation prompt's own §9 open
+questions, resolved here): app-layer `household_id` enforcement, not RLS, for this pass (matches
+this schema's existing 100%-service-role, zero-RLS-policy posture — no anon/authenticated grants
+change). Build the identity layer directly in this app first, not in `rocky-coast-labs`'s
+`packages/rocky-coast-auth` — that package turned out to be a literal empty stub (`export {}`), and
+the monorepo's own `ARCHITECTURE.md` states three times that shared packages stay deferred until a
+second real consumer exists ("don't build auth in preemptively"); extract later if that ever becomes
+true. Rick's family-chief-of-staff sign-in will reuse his **existing** `auth.users` row
+(`rallen7425@gmail.com`, id `833b6858-59f9-480e-b27d-e0a6a800e66b`) — a real, live discovery, not
+hypothetical: querying the shared project's `auth.users` directly found he's already registered
+there for Rocky Coast Guide's admin role. **This app's code must never read that row's
+`app_metadata` — it belongs to a different app's namespace.**
+
+### What's done — Phase 1 (data model), applied to the shared DB
+
+Two migrations in `rocky-coast-labs`, both applied and verified:
+
+- **`20260912000001_family_chief_of_staff_identity_households.sql`** — new `households` +
+  `household_invites` tables; `family_members` gains `household_id`, `has_approval_authority`
+  (deliberately separate from `is_head_of_household`), `account_status`
+  (`profile_only`/`activated`), `auth_user_id` (FK → `auth.users`), `view_scope`, `submission_tier`.
+  `household_id` added and backfilled on every other real table in the schema — the authoritative
+  list came from grepping every `create table family_chief_of_staff.*` across this schema's actual
+  migration history, not trusted from the plan doc alone, which was missing two real tables:
+  `member_email_domains` and `keep_in_mind_items`. One real `households` row created for the
+  existing Rick/Kim/Ben/Nora household; Rick marked `activated` with the `auth_user_id` above and
+  `has_approval_authority = true`; Kim/Ben/Nora stay `profile_only`. **Also dropped the long-dead
+  `events`/`todos` tables** (orphaned since the 2026-08-28 entries migration, which explicitly left
+  them "as a rollback net" pending this exact follow-up that never happened — 67 + 26 stale rows,
+  confirmed unread by any code path, gone).
+- **`20260912000002_family_chief_of_staff_household_id_default.sql`** — a same-session follow-up
+  fix: the first migration made `household_id` `NOT NULL` everywhere with no default, which would
+  have immediately broken every existing write path in the live app (`lib/actions/*.ts`, the
+  email-scan pipeline, chore completion, etc.) — none of that code sets `household_id` yet, since
+  wiring it in is later-phase work that needs a real session to read a household from. Fixed by
+  defaulting every `household_id` column (including `family_members`, to keep today's live "Add
+  family member" flow working) to the one real household while there's only one. **These defaults
+  must be dropped together, not table-by-table, once a real second household can exist and every
+  write path explicitly sets its own `household_id`** — leaving them in place past that point would
+  silently misattribute a forgotten write to this one household.
+
+**Verified**: both migrations applied via `supabase db push` (confirmed via `supabase migration
+list` that no *other* repo's pending/untracked migrations got swept in accidentally — several
+unrelated ones sitting in the working tree were already applied remotely, confirmed before
+pushing). Queried `households`/`family_members` directly post-migration — one household, correct
+per-member `account_status`/`auth_user_id`/`has_approval_authority`. Confirmed `events`/`todos`
+actually gone (404 via PostgREST). Tested a real insert with no `household_id` in the payload
+(`notification_dismissals`) — correctly picked up the default, then deleted. Production app
+smoke-checked after both migrations (`/`, `/schedule`, `/todo`, `/chores`, `/family`,
+`/notifications` all 200) — no regression from the schema change, as expected since no app code
+changed yet.
+
+### RESUME HERE — Phase 2 next (Supabase Auth provider setup), pending user go-ahead
+
+Stopped here per the implementation prompt's own phase-by-phase review requirement. Still open,
+blocking later phases (not Phase 1): GCP/OAuth client topology for identity-purpose Google sign-in,
+whether to build Microsoft sign-in this pass (no Azure app registration exists for anything yet),
+`LockScreen`'s fate (retire vs. lightweight per-member re-auth on an already-authenticated device),
+outbound transactional email provider for invites, whether to wire up Distilled as a second
+consumer in this same pass. No app code (`family-chief-of-staff` repo) has been touched yet — this
+phase was schema-only, in `rocky-coast-labs`.
+
+---
+
 ## Session status (2026-09-08) — Gamified Chore List: full build, P0–P3 (DEPLOYED — paused for on-device testing)
 
 Read `gamified-chore-list-implementation-prompt.md` (+ `gamified-chore-list-plan.md`
