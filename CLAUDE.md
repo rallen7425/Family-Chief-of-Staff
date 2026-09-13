@@ -15,7 +15,7 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phases 1–4 — IN PROGRESS, stopped for review
+## Session status (2026-09-12/13) — Identity, Sign-In & Onboarding: Phases 1–5 — IN PROGRESS, stopped for review
 
 Working from `identity-signin-onboarding-implementation-prompt.md` (+ `identity-signin-onboarding-plan.md`,
 `mvp-spec.md`, `design-system.md` — all repo-root, untracked, same convention as the other
@@ -219,7 +219,7 @@ correctly `profile_only`/`auth_user_id: null` with the right relationship/birthd
 same `household_id`). Deleted all test rows (household, both family_members, the auth user)
 afterward. `tsc`/eslint/178 tests/build all green throughout.
 
-### RESUME HERE — Phase 5 next (invite/join flow), pending user go-ahead
+### Phase 5 — Invite/join flow (both paths built)
 
 **Outbound email decided**: Supabase's built-in `supabase.auth.admin.inviteUserByEmail()`, not a
 third-party provider (Resend/Postmark) — it's the mechanism Supabase Auth already ships specifically
@@ -227,15 +227,75 @@ for "create an invited user and email them a link to complete signup," which is 
 job for both invite types (`new_adult`: invite directly; `activate_member`: invite, then link the
 resulting `auth_user_id` to the existing profile-only `family_members` row on acceptance). No new
 provider account, API key, or package. Rejected a dedicated provider as infrastructure ahead of
-proven need — same reasoning as the GCP-topology and Microsoft-sign-in decisions. **Not yet
-verified that this project's Supabase SMTP actually delivers** — sign-up testing so far never
-exercised it (email confirmation is off, so no email was ever sent). Check the project's mail
-settings before relying on it, and when ready to verify real delivery, send one test invite to an
-inbox the user actually controls — not something to fire off without their awareness, since it's a
-real outbound email, unlike the throwaway `*.test`-domain accounts used everywhere else so far.
+proven need — same reasoning as the GCP-topology and Microsoft-sign-in decisions. **Still not
+verified that this project's Supabase SMTP actually delivers a real email** — every check this
+phase used `generateLink` (mints the same token, never sends mail) specifically to avoid firing a
+real send without the user's awareness. When ready to verify real delivery, send one test invite to
+an inbox the user actually controls.
 
-Join-mechanism split (code for `activate_member`, link/email for `new_adult`) already resolved in
-the plan doc — no re-decision needed, just confirm at build time.
+User chose **"Build both paths now"** (join-code for `activate_member`, email-link for both
+`activate_member` and brand-new `new_adult` co-parents) over scoping down to join-code only.
+
+- **`lib/actions/invites.ts`** (new) — `inviteExistingMemberByCode`/`inviteExistingMemberByEmail`
+  (parent-side, from the roster), `inviteCoParent` (from `/onboarding/invite`, no longer
+  auto-redirects — "Send invite" and "Finish setup" are separate actions, matching the design
+  canvas), `redeemJoinCode` (creates the invitee's `auth.users` row via `admin.createUser` since
+  they have no session yet, links `family_members`, then `signInWithPassword` to actually
+  establish one), `completeEmailInvite` (called once a session already exists — resolves which
+  pending invite belongs to the now-authenticated email, no invite id needs to travel through the
+  URL), `completeNewAdultProfile` (the `/onboarding/join-profile` step below).
+- **`/join/[code]`** (new, Server Component) — validates the code + expiry, renders `JoinForm`
+  (email + password only; the code itself comes from the URL). **`/join/accept`** (new) — lands
+  here from an emailed invite link; `JoinAcceptClient` establishes the session then calls
+  `completeEmailInvite`.
+- **New gap found and closed, not in the plan doc**: a `new_adult` invite has no name/birthdate on
+  file (only an email) — added **`/onboarding/join-profile`** (`NewAdultProfileForm`), a distinct,
+  abbreviated step from `/onboarding/profile` (which creates a whole new household) for exactly
+  this case.
+- **`InviteMemberModal`** (new, wired into `HouseholdRoster`'s "Invite to create login" action) —
+  Email/Join-code method toggle, view_scope + submission_tier pills, confirmation states (shows
+  the generated code, or "Invite sent to {email}").
+
+**Real bug found and fixed during E2E testing — the email-link path was silently broken**:
+`@supabase/ssr`'s `createBrowserClient` **hardcodes `flowType: "pkce"`** (not overridable via
+options — see `node_modules/@supabase/ssr/dist/module/createBrowserClient.js`), which is
+incompatible with this project's implicit hash-fragment invite-link flow (confirmed empirically in
+the Phase 5 pre-work below) — its automatic `detectSessionInUrl` threw
+`AuthPKCEGrantCodeExchangeError` on the hash instead of consuming it. A first pass at testing this
+looked like it worked, but only because a stale session from an earlier sign-in was still sitting
+in cookies; with a genuinely clean session (a real first-time invitee) it failed outright. **Fixed**
+in `JoinAcceptClient.tsx`: parse `access_token`/`refresh_token` out of the hash directly and call
+`supabase.auth.setSession(...)`, which sets the session from given tokens regardless of flow type —
+bypasses `detectSessionInUrl` entirely. A second, related bug surfaced by the same test: React's
+dev-mode double-effect-invocation could call `completeEmailInvite()` twice concurrently (a missing
+cancellation check between `setSession` resolving and the action call) — the stale invocation won
+the DB race silently while the live one saw "no pending invite" and showed a false error. Fixed by
+adding the missing `if (cancelled) return;` check right after `setSession` resolves, so only the
+live effect instance ever calls the action.
+
+**Verified end-to-end against the real shared database**, all three flows, via throwaway
+`*.test`-domain accounts (all deleted after, `admin.generateLink` used throughout — never a real
+send): (1) join-code — parent invited a real added household member by code, redeemed it as that
+member with a fresh email+password, confirmed via direct query: `account_status: 'activated'`, the
+right `auth_user_id`/`view_scope`/`submission_tier`, invite row `accepted`. (2) email-link,
+`activate_member` — same linking, invite `accepted`, correctly redirects to `/`. (3) email-link,
+`new_adult` (co-parent) — redirected to `/onboarding/join-profile`, completed it, confirmed a new
+`family_members` row landed in the **same** household with `is_head_of_household: true`,
+`is_adult` correctly computed from the entered birthdate, `account_status: 'activated'`. All test
+household/members/invites/auth-users cleaned up afterward — confirmed the DB is back to exactly
+Rick/Kim/Ben/Nora, one household, zero leftover invites. `tsc`/eslint/**178 tests**/`next build`
+all green after every change.
+
+### RESUME HERE — commit/push done, Phase 6+ next, pending user go-ahead
+
+Still open, carried forward unchanged from Phase 2: the manual GCP/Supabase-dashboard step for
+Google sign-in (new OAuth client, paste into Supabase Auth config, add the production redirect URL
+to the allow-list) — blocks the Google button on `/signin`/`/signup` and also blocks real (not
+`generateLink`-only) invite-email delivery, since both need a real allowed redirect URL configured.
+Also still open, not yet re-decided: `LockScreen`'s fate, whether to wire up Distilled as a second
+consumer, and the still-deferred household-id query-scoping sweep across `lib/data/*.ts` (Today/
+Schedule/etc. will keep showing Rick's real data regardless of which household is signed in until
+that sweep happens — flagged and accepted back in Phase 4, not new).
 
 Still open more generally: `LockScreen`'s fate, whether to wire up Distilled as a second consumer.
 The Phase 2 manual GCP/Supabase-dashboard step (Google sign-in) remains outstanding and independent

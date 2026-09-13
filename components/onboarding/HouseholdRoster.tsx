@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/shared/Modal";
 import { AddHouseholdMemberForm } from "@/components/onboarding/AddHouseholdMemberForm";
+import { InviteMemberModal } from "@/components/onboarding/InviteMemberModal";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
 import { ACCENT_HEX } from "@/lib/colors";
 import { ageInYears } from "@/lib/family";
@@ -14,8 +15,7 @@ import type { FamilyMember } from "@/lib/types";
  * The design canvas's AI-wizard entry point is deliberately not built yet:
  * its ambiguous-birthdate handling (e.g. "Emma just turned 6" with no
  * exact date) is an open decision per the implementation prompt, not
- * something to guess at. Roster rows also omit the canvas's "Invite to
- * create login" action — that needs the outbound-email decision, Phase 5. */
+ * something to guess at. */
 export function HouseholdRoster({
   householdName,
   self,
@@ -27,6 +27,7 @@ export function HouseholdRoster({
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const [invitingMember, setInvitingMember] = useState<FamilyMember | null>(null);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -73,6 +74,13 @@ export function HouseholdRoster({
                     </p>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setInvitingMember(m)}
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-input border border-dashed border-border bg-mist py-2 text-[12px] font-semibold text-muted-text transition-colors hover:bg-border/40"
+                >
+                  Invite to create login
+                </button>
               </div>
             );
           })}
@@ -108,6 +116,16 @@ export function HouseholdRoster({
           onCancel={() => setAdding(false)}
         />
       </Modal>
+
+      {invitingMember && (
+        <InviteMemberModal
+          member={invitingMember}
+          onClose={() => {
+            setInvitingMember(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

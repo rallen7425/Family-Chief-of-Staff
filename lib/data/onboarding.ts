@@ -58,6 +58,17 @@ export async function getHouseholdMembers(householdId: string): Promise<FamilyMe
   return data.map(mapFamilyMember);
 }
 
+export async function getFamilyMemberById(id: string): Promise<FamilyMember | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("family_members")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle<FamilyMemberRow>();
+  if (error) throw error;
+  return data ? mapFamilyMember(data) : null;
+}
+
 /** Who currently holds approval authority in this household — only
  * meaningful for the Permissions step, so kept out of the shared
  * FamilyMember type rather than adding a field nothing else reads yet. */

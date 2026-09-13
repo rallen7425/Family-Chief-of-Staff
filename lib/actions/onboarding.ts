@@ -149,5 +149,5 @@ export async function setApprovalAuthority(memberId: string): Promise<{ error?: 
     .eq("household_id", self.householdId);
   if (setError) return { error: setError.message };
 
-  redirect("/");
+  redirect("/onboarding/invite");
 }
