@@ -286,16 +286,52 @@ household/members/invites/auth-users cleaned up afterward — confirmed the DB i
 Rick/Kim/Ben/Nora, one household, zero leftover invites. `tsc`/eslint/**178 tests**/`next build`
 all green after every change.
 
-### RESUME HERE — commit/push done, Phase 6+ next, pending user go-ahead
+### Current status
 
-Still open, carried forward unchanged from Phase 2: the manual GCP/Supabase-dashboard step for
-Google sign-in (new OAuth client, paste into Supabase Auth config, add the production redirect URL
-to the allow-list) — blocks the Google button on `/signin`/`/signup` and also blocks real (not
-`generateLink`-only) invite-email delivery, since both need a real allowed redirect URL configured.
-Also still open, not yet re-decided: `LockScreen`'s fate, whether to wire up Distilled as a second
-consumer, and the still-deferred household-id query-scoping sweep across `lib/data/*.ts` (Today/
-Schedule/etc. will keep showing Rick's real data regardless of which household is signed in until
-that sweep happens — flagged and accepted back in Phase 4, not new).
+Phases 1–5 of `identity-signin-onboarding-implementation-prompt.md` are built, verified end-to-end
+against the real shared database (throwaway `*.test` accounts, all cleaned up afterward), and
+green on `tsc`/eslint/178 tests/`next build`. Committed and **pushed to `origin/main`** (`9074cff`).
+**Not deployed** — no `vercel --prod` has run for any of this yet, so production is still on the
+pre-identity build. The feature as originally scoped is **not finished** — see gaps below before
+telling the user this workstream is done.
+
+### What's broken / incomplete right now
+
+- **Google sign-in is non-functional.** The Phase 2 manual step (new GCP OAuth client, paste
+  credentials into Supabase Auth's Google provider config, add the production redirect URL to
+  Supabase's allow-list — dashboard only, never `supabase config push`, see Phase 2's own note on
+  why) was never done. The button on `/signin`/`/signup` will error until it is.
+- **Real invite-email delivery is unverified.** Every Phase 5 check used `admin.generateLink`
+  specifically to avoid sending mail — whether this project's Supabase SMTP actually delivers to a
+  real inbox has never been tested. Also blocked on the same redirect-allow-list step above.
+- **`InviteMemberLogin` has only one of its two required entry points.** The implementation
+  prompt's own §7 calls for `/family/[memberId]`'s existing roster actions to reach it too ("one
+  entry point, not two") — right now "Invite to create login" only exists on the new onboarding
+  `HouseholdRoster` screen, not on the pre-existing Manage Family page. Real gap against the spec,
+  not a deferral.
+- **`LockScreen`/`fcos_active_member` and real Supabase Auth now coexist, unreconciled.** This is
+  why Today/Schedule/Chores/etc. still show Rick's real household's data regardless of which
+  household is actually signed in — the rest of the app has no household-scoped queries yet
+  (flagged and accepted back in Phase 4, not new, but still genuinely unresolved).
+- **AI onboarding wizard** (`OnboardingFamilyWizard`, natural-language family entry) was never
+  built — the implementation prompt's own open question on ambiguous-birthdate handling was never
+  decided. Manual add-member is the only path.
+- **"Connect Gmail & Calendar" card** omitted from `/onboarding/profile` — needs the existing
+  connector flow's identity resolution reworked first (it currently reads `fcos_active_member`,
+  not a real session).
+
+### RESUME HERE — next session should
+
+1. **Deploy** (`vercel --prod`) once the user wants this live — nothing has gone to production yet.
+2. **Do the Phase 2 manual dashboard step** (Google OAuth client + Supabase redirect allow-list) —
+   unblocks both Google sign-in and real invite-email delivery in one step.
+3. **Wire `/family/[memberId]`'s roster actions into `InviteMemberLogin`** — the one-entry-point
+   gap above.
+4. **Decide `LockScreen`'s fate** (retire vs. keep as lightweight per-member re-auth) and, once
+   decided, the `household_id` query-scoping sweep across `lib/data/*.ts` that real multi-household
+   use actually needs.
+5. Lower priority / explicitly optional per the prompt's own §8: the AI wizard, the connect-card
+   rework, whether to wire Distilled onto the shared identity layer.
 
 Still open more generally: `LockScreen`'s fate, whether to wire up Distilled as a second consumer.
 The Phase 2 manual GCP/Supabase-dashboard step (Google sign-in) remains outstanding and independent
