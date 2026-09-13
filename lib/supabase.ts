@@ -18,10 +18,12 @@ const realtimeOptions =
 
 /**
  * Server-only, service-role client scoped to the `family_chief_of_staff`
- * schema. No auth in this app (single household, single implicit user), so
- * there's no browser client, no anon key, and no session/cookie handling —
- * every read and write goes through this one client from server code
- * (Server Components, Server Actions, route handlers, pipeline scripts).
+ * schema — every family_chief_of_staff data read/write goes through this one
+ * client from server code (Server Components, Server Actions, route
+ * handlers, pipeline scripts), unchanged by the Identity/Sign-In/Onboarding
+ * pass (2026-09-12): this app now has real auth (see lib/auth/), but data
+ * access stays app-layer-enforced on the service-role key by design, not
+ * moved to RLS/the anon key — see that pass's CLAUDE.md note for why.
  */
 export function getSupabaseClient() {
   const url = process.env.SUPABASE_URL;

@@ -31,3 +31,20 @@ export const getFamilyMembers = cache(async (): Promise<FamilyMember[]> => {
   if (error) throw error;
   return data.map(mapFamilyMember);
 });
+
+/** The one place sign-in/onboarding (lib/actions/auth.ts, the OAuth
+ * callback route) decides "does this authenticated person already have a
+ * household profile" — null means not yet (send them to onboarding).
+ * Deliberately not exported from lib/auth/: linking a Supabase Auth user to
+ * a family_members row is this app's own concept, not the shared identity
+ * layer's. */
+export async function getFamilyMemberByAuthUserId(authUserId: string): Promise<FamilyMember | null> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("family_members")
+    .select("*")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle<FamilyMemberRow>();
+  if (error) throw error;
+  return data ? mapFamilyMember(data) : null;
+}

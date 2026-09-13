@@ -15,7 +15,7 @@ not a convention to follow.
 
 ---
 
-## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phase 1 (data model) — IN PROGRESS, stopped for review
+## Session status (2026-09-12) — Identity, Sign-In & Onboarding: Phases 1–3 — IN PROGRESS, stopped for review
 
 Working from `identity-signin-onboarding-implementation-prompt.md` (+ `identity-signin-onboarding-plan.md`,
 `mvp-spec.md`, `design-system.md` — all repo-root, untracked, same convention as the other
@@ -75,15 +75,97 @@ smoke-checked after both migrations (`/`, `/schedule`, `/todo`, `/chores`, `/fam
 `/notifications` all 200) — no regression from the schema change, as expected since no app code
 changed yet.
 
-### RESUME HERE — Phase 2 next (Supabase Auth provider setup), pending user go-ahead
+### Phase 2 — Supabase Auth provider setup
 
-Stopped here per the implementation prompt's own phase-by-phase review requirement. Still open,
-blocking later phases (not Phase 1): GCP/OAuth client topology for identity-purpose Google sign-in,
-whether to build Microsoft sign-in this pass (no Azure app registration exists for anything yet),
-`LockScreen`'s fate (retire vs. lightweight per-member re-auth on an already-authenticated device),
+Decisions: new GCP OAuth client in the **existing** "Family Chief of Staff" project (not a
+portfolio-wide project) for identity-purpose Google sign-in, kept cleanly separate from the
+connectors' Web client; **Microsoft sign-in deferred** (no Azure app registration exists anywhere
+in the portfolio yet, and building one purely for identity while Outlook connectors stay unbuilt
+is infra ahead of proven need).
+
+- **`SUPABASE_ANON_KEY` added** (`.env.local`, plus `NEXT_PUBLIC_SUPABASE_URL`/
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` for the browser client) — **the first time this app has used the
+  anon key**, exactly the architecture change the implementation prompt flagged as a first-of-its-
+  kind. Same value already used by `apps/summer-village` on this shared project (confirmed
+  identical, not guessed) — an anon key is per-project, not per-app-schema.
+- **`lib/auth/`** (new, cleanly isolated per the "build in-app first" decision — imports nothing
+  about households/family members, so promoting it to a real `rocky-coast-auth` package later is a
+  lift, not a rewrite): `browserClient.ts`, `serverClient.ts` (the `@supabase/ssr` Next.js SSR
+  pattern), `session.ts` (`getAuthUser()`).
+- **`proxy.ts`** (repo root, session-refresh only, no route gating) — **this Next.js version has
+  already deprecated `middleware.ts` in favor of `proxy.ts`** (caught via the build's own
+  deprecation warning + the bundled `node_modules/next/dist/docs/`, per this repo's `AGENTS.md`
+  warning that this Next.js has real breaking changes from training-data assumptions). Built and
+  named correctly from the start once caught.
+- `lib/supabase.ts`'s header comment updated — the "no anon key exists in this app" claim it made
+  is no longer true; that client's own purpose (service-role data access) is otherwise unchanged.
+
+**Verified end-to-end against the real shared Supabase project**: email/password sign-up returns
+an active session immediately (confirmed empirically — **email confirmation is off** on this
+project, not assumed), created and deleted a real throwaway `*.test`-domain account via the admin
+API.
+
+**Manual step still needed from the user** (GCP/Supabase dashboard — same category as the original
+Gmail OAuth setup): create the new Google OAuth client (Web application, in the existing GCP
+project, redirect URI `https://kywdezqgrtpzuecxxvfc.supabase.co/auth/v1/callback`), paste its
+ID/secret into Supabase Auth's Google provider config, and add
+`https://family-chief-of-staff.vercel.app/**` to Supabase's redirect-URL allow-list — **all via the
+dashboard, never via `supabase config push`**, which pushes `config.toml`'s `[auth]` section
+wholesale and has already once silently overwritten this shared project's real Auth settings with
+local-dev defaults (documented in `rocky-coast-labs/ARCHITECTURE.md`). Until this is done, the
+Google button on `/signin`/`/signup` will error; email/password already fully works.
+
+### Phase 3 — Core sign-in/session
+
+- **`lib/actions/auth.ts`** (new, app-specific glue — deliberately *not* in `lib/auth/`):
+  `signInWithPasswordAction`, `signInWithGoogleAction`, `signUpWithPasswordAction`, and
+  `resolvePostSignInDestination()` — the one place that decides Today vs. onboarding after a real
+  sign-in, by checking `lib/data/familyMembers.ts`'s new `getFamilyMemberByAuthUserId()` for a
+  linked row. `/onboarding/profile` is Phase 4 (not built) — a not-yet-onboarded sign-in correctly
+  redirects there and clean-404s for now, which is expected mid-build state, not a bug.
+- **`app/auth/callback/route.ts`** (new) — the Google OAuth code-exchange landing route.
+- **`/signin` + `/signup`** (new) — built to match the "Identity & Onboarding" design canvas's
+  `SignIn`/`CreateAccount` artboards pixel-for-pixel (fetched and parsed directly from the
+  published canvas artifact, not guessed), reimplemented on this app's real Tailwind tokens instead
+  of the mockup's inline hex values. Wordmark reads "Family Chief of Staff" — **not** "Rufus" — per
+  the naming rule; the plan doc's own "Rufus — Your Family's Chief of Staff" wordmark is exactly
+  the placeholder text that rule says to treat as TBD. Microsoft button omitted per the Phase 2
+  decision. "Forgot password?" renders inert (not yet wired) rather than as a dead link.
+- **Real structural bug found and fixed**: `/signin` initially rendered *inside* the main app's
+  full chrome (header, tab row, chat bar) — `app/layout.tsx` was a single root layout with
+  LockScreen-gating logic that unconditionally wrapped every route, `/signin` included, with no
+  awareness that a pre-auth page shouldn't show navigation to app screens or a live chat bar.
+  Next.js has no way to give one route tree a different top-level layout than another except a
+  route group, so fixing this meant moving **every existing route** (`chores`, `family`, `message`,
+  `notifications`, `privacy`, `profile`, `review`, `schedule`, `settings`, `todo`, root `page.tsx`,
+  `error.tsx`, `loading.tsx`) into a new `app/(app)/` group carrying exactly the old root layout's
+  chrome/LockScreen logic (relocated, not changed), while `app/layout.tsx` became a minimal
+  html/body/fonts shell and `/signin`, `/signup` render standalone under it. **This does not touch
+  or resolve LockScreen's fate** — `fcos_active_member`, `MemberPicker`, and the `locked` check are
+  100% unchanged, just relocated; the open decision (retire vs. keep as a lightweight per-member
+  re-auth) is untouched. Caught and fixed a second-order break from the same move: Next.js's
+  top-level 404 only ever resolves the true-root `not-found.tsx`, so the moved one stopped covering
+  genuinely-unmatched paths (silently fell back to Next's generic default 404, verified via a real
+  request) — fixed with a new minimal `app/not-found.tsx` at the true root, keeping
+  `app/(app)/not-found.tsx` for `notFound()` calls thrown by routes inside the app group (e.g. a
+  bad `/family/[memberId]`).
+
+**Verified end-to-end against the real shared Supabase project, in a real browser**: `/signin` and
+`/signup` render standalone (no app chrome); created a real throwaway account through the actual
+`/signup` UI, confirmed the redirect correctly targeted `/onboarding/profile` (not `/`, since no
+linked `family_members` row exists) and clean-404'd there; signed in with that same account through
+the actual `/signin` UI, same correct redirect; confirmed the account in `auth.users` via the admin
+API, then deleted it. Confirmed the existing app (`/`, as Rick, via the real `fcos_active_member`
+cookie) still renders with full chrome and real data, unaffected by the restructure. Full
+`tsc`/eslint/178 tests/`next build` clean after every step.
+
+### RESUME HERE — Phase 4 next (onboarding flow), pending user go-ahead + the Phase 2 manual step
+
+Still open, blocking later phases: `LockScreen`'s fate (retire vs. lightweight per-member re-auth
+on an already-authenticated device — now a real, live question given `/signin` exists and works),
 outbound transactional email provider for invites, whether to wire up Distilled as a second
-consumer in this same pass. No app code (`family-chief-of-staff` repo) has been touched yet — this
-phase was schema-only, in `rocky-coast-labs`.
+consumer in this same pass. The Phase 2 manual GCP/Supabase-dashboard step (above) is independent
+of starting Phase 4 — Google sign-in isn't required for onboarding itself to be buildable.
 
 ---
 
