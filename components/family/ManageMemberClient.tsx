@@ -6,6 +6,7 @@ import { Shield, Trash2 } from "lucide-react";
 import { MemberProfileFields } from "@/components/profile/MemberProfileFields";
 import { AdditionalContextDetails } from "@/components/profile/AdditionalContextDetails";
 import { ForgetDialog } from "@/components/settings/ForgetDialog";
+import { InviteMemberModal } from "@/components/onboarding/InviteMemberModal";
 import { removeFamilyMember } from "@/lib/actions/familyMembers";
 import type { FamilyMember, MemberDetail } from "@/lib/types";
 
@@ -25,6 +26,7 @@ export function ManageMemberClient({
   const router = useRouter();
   const [forgetOpen, setForgetOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, start] = useTransition();
 
@@ -47,6 +49,14 @@ export function ManageMemberClient({
         items={details}
         viewAllHref={`/family/${member.id}/details`}
       />
+
+      <button
+        type="button"
+        onClick={() => setInviting(true)}
+        className="flex items-center justify-center gap-1.5 rounded-input border border-dashed border-border bg-mist py-2.5 text-[13px] font-semibold text-muted-text transition-colors hover:bg-border/40"
+      >
+        Invite {firstName(member.name)} to create a login
+      </button>
 
       <div className="mt-2 border-t border-border pt-4 flex flex-col gap-2.5">
         <p className="text-[11px] font-bold text-muted-label uppercase tracking-[0.03em]">
@@ -104,6 +114,16 @@ export function ManageMemberClient({
         members={allMembers}
         defaultMemberId={member.id}
       />
+
+      {inviting && (
+        <InviteMemberModal
+          member={member}
+          onClose={() => {
+            setInviting(false);
+            router.refresh();
+          }}
+        />
+      )}
     </>
   );
 }
