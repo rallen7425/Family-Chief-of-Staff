@@ -138,6 +138,7 @@ async function processMessage(
     await supabase.from("email_scan_log").insert({
       gmail_message_id: message.id,
       connection_id: connection.id,
+      household_id: householdId,
       thread_id: message.threadId,
       sender: message.sender,
       subject: message.subject,
@@ -161,6 +162,7 @@ async function processMessage(
     await supabase.from("email_scan_log").insert({
       gmail_message_id: messageId,
       connection_id: connection.id,
+      household_id: householdId,
       status: "error",
       error_detail: errorDetail,
     });
