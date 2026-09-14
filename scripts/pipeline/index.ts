@@ -39,6 +39,23 @@ const MESSAGE_CONCURRENCY = 4;
 
 const SCAN_WINDOW_DAYS = 4;
 
+/**
+ * A brief Supabase connectivity blip on the shared project (seen in prod —
+ * run #35, 2026-09-14) can fail one of the startup reads below outside any
+ * per-message/per-connection error handling, turning a transient hiccup into
+ * a full run failure. One retry after a short delay is enough to ride out
+ * that class of blip without masking a real, persistent outage (which will
+ * still fail after the retry, exactly as before).
+ */
+async function withRetry<T>(fn: () => Promise<T>, delayMs = 1500): Promise<T> {
+  try {
+    return await fn();
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return fn();
+  }
+}
+
 export interface PipelineResult {
   scanned: number;
   skipped: number;
@@ -249,12 +266,14 @@ async function processConnection(
 }
 
 export async function runEmailScanPipeline(): Promise<PipelineResult> {
-  const [connections, familyMembers, emailDomains, arrivalRules] = await Promise.all([
-    getActiveEmailConnections(),
-    getFamilyMembers(),
-    getMemberEmailDomains(),
-    getArrivalBufferRules(),
-  ]);
+  const [connections, familyMembers, emailDomains, arrivalRules] = await withRetry(() =>
+    Promise.all([
+      getActiveEmailConnections(),
+      getFamilyMembers(),
+      getMemberEmailDomains(),
+      getArrivalBufferRules(),
+    ])
+  );
 
   const result: PipelineResult = {
     scanned: 0,

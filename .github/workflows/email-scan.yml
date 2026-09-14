@@ -16,8 +16,14 @@ jobs:
         # The route loops over every active email connection, capping how
         # many new messages it processes per connection per call, so a
         # backlog drains over several runs rather than timing out in one.
+        # --retry-all-errors covers 5xx too (curl's plain --retry only
+        # retries transport-level failures) — rides out a transient blip
+        # (e.g. a brief Supabase connectivity hiccup on the shared project,
+        # seen in prod run #35 on 2026-09-14) within this same run instead of
+        # needing a manual rerun or waiting for the next 2-hour tick.
         run: |
           curl -f -X POST \
+            --retry 3 --retry-delay 5 --retry-all-errors \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             "${{ vars.APP_URL }}/api/pipeline/email-scan"
