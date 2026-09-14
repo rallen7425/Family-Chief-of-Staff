@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { effectiveIsAdult } from "@/lib/family";
 import {
   getChores,
@@ -17,19 +17,20 @@ import { TodaysChores } from "@/components/chores/TodaysChores";
 export const dynamic = "force-dynamic";
 
 export default async function ChoresPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
-  // The lock screen (app/layout.tsx) gates the whole app when no member is
-  // active — an empty roster is the only way this is reached with none.
+  const activeMember = await getCurrentMember();
+  // The (app) layout always redirects to /signin with no signed-in member —
+  // this is just for type narrowing below.
   if (!activeMember) return null;
+  const householdId = activeMember.householdId;
+  const familyMembers = await getFamilyMembers(householdId);
 
   const kids = familyMembers.filter((m) => !effectiveIsAdult(m));
 
   if (effectiveIsAdult(activeMember)) {
     const [chores, allPoints, pendingClaims, completionsByKid] = await Promise.all([
-      getChores(),
+      getChores(householdId),
       getAllMemberPoints(kids.map((k) => k.id)),
-      getPendingGoalClaims(),
+      getPendingGoalClaims(householdId),
       Promise.all(kids.map((k) => getCompletionsForMember(k.id))),
     ]);
     return (
@@ -44,7 +45,7 @@ export default async function ChoresPage() {
   }
 
   const [chores, completions, points] = await Promise.all([
-    getActiveChoresForMember(activeMember.id),
+    getActiveChoresForMember(householdId, activeMember.id),
     getCompletionsForMember(activeMember.id),
     getMemberPoints(activeMember.id),
   ]);

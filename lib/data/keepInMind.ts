@@ -12,11 +12,12 @@ function mapKeepInMindItem(row: KeepInMindRow): KeepInMindItem {
   };
 }
 
-export async function getActiveKeepInMindItems(): Promise<KeepInMindItem[]> {
+export async function getActiveKeepInMindItems(householdId: string): Promise<KeepInMindItem[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("keep_in_mind_items")
     .select("*")
+    .eq("household_id", householdId)
     .eq("dismissed", false)
     .order("created_at")
     .returns<KeepInMindRow[]>();

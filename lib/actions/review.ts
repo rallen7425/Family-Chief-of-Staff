@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
+import { requireHousehold } from "@/lib/actions/requireHousehold";
 import type { EntryKind } from "@/lib/types";
 
 /** `kind` is retained for the client's grouping/labelling; the action
@@ -20,6 +21,8 @@ function revalidateReviewViews() {
 
 async function setStatus(items: ReviewItemRef[], status: "confirmed" | "dismissed"): Promise<void> {
   if (items.length === 0) return;
+  const household = await requireHousehold();
+  if ("error" in household) throw new Error(household.error);
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("entries")
@@ -27,7 +30,8 @@ async function setStatus(items: ReviewItemRef[], status: "confirmed" | "dismisse
     .in(
       "id",
       items.map((item) => item.id)
-    );
+    )
+    .eq("household_id", household.householdId);
   if (error) throw error;
   revalidateReviewViews();
 }

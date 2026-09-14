@@ -4,6 +4,7 @@ import type { ArrivalBufferRule } from "@/lib/arrival";
 
 interface ArrivalBufferRuleRow {
   id: string;
+  household_id: string;
   category: string | null;
   applies_to_kids_only: boolean;
   buffer_minutes: number;
@@ -20,11 +21,12 @@ function mapRule(row: ArrivalBufferRuleRow): ArrivalBufferRule {
 }
 
 /** Ordered general-first (category IS NULL), then by creation order. */
-export const getArrivalBufferRules = cache(async (): Promise<ArrivalBufferRule[]> => {
+export const getArrivalBufferRules = cache(async (householdId: string): Promise<ArrivalBufferRule[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("arrival_buffer_rules")
     .select("*")
+    .eq("household_id", householdId)
     .order("category", { ascending: true, nullsFirst: true })
     .order("created_at")
     .returns<ArrivalBufferRuleRow[]>();

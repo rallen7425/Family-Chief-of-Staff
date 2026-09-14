@@ -1,22 +1,17 @@
 "use client";
 
 import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { SettingsRowContent, settingsRowClass } from "@/components/settings/SettingsRow";
-import { logOut } from "@/lib/actions/familyMembers";
+import { signOutAction } from "@/lib/actions/auth";
 
 export function LogOutRow() {
-  const router = useRouter();
   const [isPending, start] = useTransition();
   return (
     <button
       type="button"
       disabled={isPending}
-      onClick={() => start(async () => {
-        await logOut();
-        router.refresh();
-      })}
+      onClick={() => start(() => signOutAction())}
       className={`${settingsRowClass} disabled:opacity-60`}
     >
       <SettingsRowContent
@@ -24,7 +19,7 @@ export function LogOutRow() {
         iconBg="#FDF1EF"
         iconColor="#E8567A"
         label="Log out"
-        sub="Return to the profile chooser"
+        sub="Sign in as someone else from here"
       />
     </button>
   );

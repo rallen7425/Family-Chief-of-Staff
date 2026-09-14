@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { getSupabaseClient } from "@/lib/supabase";
 import { computeIsAdult, effectiveIsAdult } from "@/lib/family";
-import { ACTIVE_MEMBER_COOKIE, LOGGED_OUT } from "@/lib/activeMember";
+import { requireHousehold } from "@/lib/actions/requireHousehold";
 import type { AccentColor } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,14 +28,6 @@ export interface FamilyMemberInput {
   phone: string | null;
   school: string | null;
   grade: string | null;
-  /** Set only when creating a member as part of onboarding a *new*
-   * household (lib/actions/onboarding.ts) — every other caller (the
-   * existing "Add family member" flow) omits this and gets the DB's
-   * default-to-the-one-real-household value, per the Identity/Onboarding
-   * pass's accepted scope (see CLAUDE.md's 2026-09-12 note: query-scoping
-   * the rest of the app is deferred, but a NEW household's own members
-   * must never be silently attached to the wrong household at write time). */
-  householdId?: string;
 }
 
 function validate(input: FamilyMemberInput): string | null {
@@ -74,6 +65,8 @@ export async function saveFamilyMember(
 ): Promise<{ error?: string }> {
   const err = validate(input);
   if (err) return { error: err };
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
 
   // Only a birthday recomputes is_adult. Editing a member without touching
@@ -82,19 +75,29 @@ export async function saveFamilyMember(
   if (input.birthday) {
     isAdult = computeIsAdult(input.birthday);
   } else if (id) {
-    const { data } = await supabase.from("family_members").select("is_adult").eq("id", id).single();
+    const { data } = await supabase
+      .from("family_members")
+      .select("is_adult")
+      .eq("id", id)
+      .eq("household_id", household.householdId)
+      .single();
     isAdult = data?.is_adult ?? true;
   } else {
     isAdult = false;
   }
 
   if (id) {
-    const { error } = await supabase.from("family_members").update(toRow(input, isAdult)).eq("id", id);
+    const { error } = await supabase
+      .from("family_members")
+      .update(toRow(input, isAdult))
+      .eq("id", id)
+      .eq("household_id", household.householdId);
     if (error) return { error: error.message };
   } else {
     const { data: last } = await supabase
       .from("family_members")
       .select("sort_order")
+      .eq("household_id", household.householdId)
       .order("sort_order", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -102,7 +105,7 @@ export async function saveFamilyMember(
     const { error } = await supabase.from("family_members").insert({
       ...toRow(input, isAdult),
       sort_order: nextOrder,
-      ...(input.householdId ? { household_id: input.householdId } : {}),
+      household_id: household.householdId,
     });
     if (error) return { error: error.message };
   }
@@ -159,8 +162,14 @@ export async function updateProfileFields(
   if (patch.accentColor !== undefined) row.accent_color = patch.accentColor;
   if (Object.keys(row).length === 0) return {};
 
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("family_members").update(row).eq("id", id);
+  const { error } = await supabase
+    .from("family_members")
+    .update(row)
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidateProfileViews();
   return {};
@@ -171,20 +180,29 @@ export async function updateProfileFields(
 /** Hard-delete of the member row (member_details cascades). Distinct from
  * `forgetMemberInfo` — kept as its own function so the two can't be merged. */
 export async function removeFamilyMember(id: string): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("family_members").delete().eq("id", id);
+  const { error } = await supabase
+    .from("family_members")
+    .delete()
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidateProfileViews();
   return {};
 }
 
 export async function setHeadOfHousehold(id: string, on: boolean): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
   if (on) {
     const { data, error: readErr } = await supabase
       .from("family_members")
       .select("birthday, is_adult")
       .eq("id", id)
+      .eq("household_id", household.householdId)
       .single();
     if (readErr) return { error: readErr.message };
     if (!effectiveIsAdult({ birthday: data?.birthday ?? null, isAdult: data?.is_adult ?? false })) {
@@ -194,7 +212,8 @@ export async function setHeadOfHousehold(id: string, on: boolean): Promise<{ err
   const { error } = await supabase
     .from("family_members")
     .update({ is_head_of_household: on })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidateProfileViews();
   return {};
@@ -204,11 +223,14 @@ export async function setHeadOfHousehold(id: string, on: boolean): Promise<{ err
  * member. Keeps id / name / accent_color / is_adult / birthday /
  * is_head_of_household, and never touches `entries`. */
 export async function forgetMemberInfo(id: string): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
   const { error: clearErr } = await supabase
     .from("family_members")
     .update({ relationship: null, email: null, phone: null, school: null, grade: null })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (clearErr) return { error: clearErr.message };
   const { error: detErr } = await supabase.from("member_details").delete().eq("family_member_id", id);
   if (detErr) return { error: detErr.message };
@@ -216,37 +238,23 @@ export async function forgetMemberInfo(id: string): Promise<{ error?: string }> 
   return {};
 }
 
+/** The most dangerous function in this file before this pass: it used to
+ * select every family_members row in the ENTIRE database with no household
+ * filter, wiping every household's profile fields in one call. Now scoped
+ * to the caller's own household only. */
 export async function forgetEverything(): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.from("family_members").select("id").returns<{ id: string }[]>();
+  const { data, error } = await supabase
+    .from("family_members")
+    .select("id")
+    .eq("household_id", household.householdId)
+    .returns<{ id: string }[]>();
   if (error) return { error: error.message };
   for (const m of data) {
     const res = await forgetMemberInfo(m.id);
     if (res.error) return res;
   }
   return {};
-}
-
-// ── active member (device convenience, not auth) ──────────────────────────
-
-export async function setActiveMember(id: string): Promise<void> {
-  const store = await cookies();
-  store.set(ACTIVE_MEMBER_COOKIE, id, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax",
-  });
-  revalidateProfileViews();
-}
-
-/** "Log out" — pre-auth: parks the device on the lock screen (a member
- * picker) until someone picks who's using the app. No session to destroy. */
-export async function logOut(): Promise<void> {
-  const store = await cookies();
-  store.set(ACTIVE_MEMBER_COOKIE, LOGGED_OUT, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax",
-  });
-  revalidateProfileViews();
 }

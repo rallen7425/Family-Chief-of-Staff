@@ -19,19 +19,20 @@ function mapGoal(row: GoalRowWithAvailability): Goal {
   };
 }
 
-export const getGoals = cache(async (): Promise<Goal[]> => {
+export const getGoals = cache(async (householdId: string): Promise<Goal[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("goals")
     .select(SELECT_WITH_AVAILABILITY)
+    .eq("household_id", householdId)
     .order("created_at")
     .returns<GoalRowWithAvailability[]>();
   if (error) throw error;
   return data.map(mapGoal);
 });
 
-export async function getGoalById(id: string): Promise<Goal | null> {
-  const goals = await getGoals();
+export async function getGoalById(householdId: string, id: string): Promise<Goal | null> {
+  const goals = await getGoals(householdId);
   return goals.find((g) => g.id === id) ?? null;
 }
 
@@ -66,11 +67,12 @@ export async function getGoalClaimsForMember(familyMemberId: string): Promise<Go
 
 /** Wrapped in cache() — the Parent Dashboard's pending-count strip and the
  * Parent Goals management queue both need this within one request. */
-export const getPendingGoalClaims = cache(async (): Promise<GoalClaim[]> => {
+export const getPendingGoalClaims = cache(async (householdId: string): Promise<GoalClaim[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("goal_claims")
     .select("*")
+    .eq("household_id", householdId)
     .eq("status", "pending")
     .order("requested_at")
     .returns<GoalClaimRow[]>();

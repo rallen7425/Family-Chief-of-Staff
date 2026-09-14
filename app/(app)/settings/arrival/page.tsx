@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
+import { getCurrentMember } from "@/lib/currentMember";
 import { ArrivalRulesEditor } from "@/components/settings/ArrivalRulesEditor";
 
 export const dynamic = "force-dynamic";
 
 export default async function ArrivalSettingsPage() {
-  const rules = await getArrivalBufferRules();
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const rules = await getArrivalBufferRules(activeMember.householdId);
 
   return (
     <>

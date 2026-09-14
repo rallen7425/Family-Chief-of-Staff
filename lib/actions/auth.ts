@@ -68,3 +68,13 @@ export async function signUpWithPasswordAction(
   if (error) return { error: error.message };
   redirect("/onboarding/profile");
 }
+
+/** Ends the real Supabase session — replaces the old fake logOut() (a
+ * device-cookie write in lib/actions/familyMembers.ts, retired). "Switch
+ * account" is just this followed by signing in again as someone else via
+ * the normal /signin form. */
+export async function signOutAction(): Promise<never> {
+  const supabase = await createAuthServerClient();
+  await supabase.auth.signOut();
+  redirect("/signin");
+}

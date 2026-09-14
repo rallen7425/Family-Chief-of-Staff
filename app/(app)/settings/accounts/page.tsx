@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Mail } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getAllEmailConnections } from "@/lib/data/emailConnections";
 import { initialsOf } from "@/lib/family";
 import { ACCENT_HEX } from "@/lib/colors";
@@ -26,13 +26,13 @@ const STATUS_CLASS: Record<EmailConnectionSummary["status"], string> = {
 };
 
 export default async function ConnectedAccountsPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
-
-  // HoH-gated — a UI convenience, not a security boundary (no auth exists).
+  const activeMember = await getCurrentMember();
   if (!activeMember?.isHeadOfHousehold) redirect("/settings");
 
-  const connections = await getAllEmailConnections();
+  const [familyMembers, connections] = await Promise.all([
+    getFamilyMembers(activeMember.householdId),
+    getAllEmailConnections(activeMember.householdId),
+  ]);
   const adults = familyMembers.filter((m) => m.isAdult);
 
   return (

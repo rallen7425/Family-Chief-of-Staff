@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getChoreById } from "@/lib/data/chores";
 import { effectiveIsAdult } from "@/lib/family";
 import { ChoreForm } from "@/components/chores/ChoreForm";
@@ -11,11 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function EditChorePage(props: PageProps<"/chores/builder/[choreId]">) {
   const { choreId } = await props.params;
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
-  if (activeMember && !effectiveIsAdult(activeMember)) redirect("/chores");
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  if (!effectiveIsAdult(activeMember)) redirect("/chores");
+  const familyMembers = await getFamilyMembers(activeMember.householdId);
 
-  const chore = await getChoreById(choreId);
+  const chore = await getChoreById(activeMember.householdId, choreId);
   if (!chore) notFound();
   const kids = familyMembers.filter((m) => !effectiveIsAdult(m));
 

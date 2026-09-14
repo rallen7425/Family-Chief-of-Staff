@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { buildSystemPrompt } from "@/lib/chat/systemPrompt";
 import { CHAT_TOOLS, executeQuerySchedule, buildDraftFromToolUse } from "@/lib/chat/tools";
 import type { ChatApiResponse, ChatMessage } from "@/lib/chat/types";
@@ -23,7 +24,16 @@ export async function POST(request: Request) {
     return NextResponse.json<ChatApiResponse>({ error: "Message is required." }, { status: 400 });
   }
 
-  const familyMembers = await getFamilyMembers();
+  // Was a fully open endpoint before real auth existed — now requires the
+  // same signed-in session as the rest of the app, both to close that gap
+  // and because a household id is needed to scope every query below.
+  const currentMember = await getCurrentMember();
+  if (!currentMember) {
+    return NextResponse.json<ChatApiResponse>({ error: "Not signed in." }, { status: 401 });
+  }
+  const householdId = currentMember.householdId;
+
+  const familyMembers = await getFamilyMembers(householdId);
   const system = buildSystemPrompt(familyMembers);
 
   const messages: Anthropic.MessageParam[] = [
@@ -67,7 +77,7 @@ export async function POST(request: Request) {
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const tool of toolUseBlocks) {
       if (tool.name === "query_schedule") {
-        const result = await executeQuerySchedule(tool.input, familyMembers);
+        const result = await executeQuerySchedule(tool.input, familyMembers, householdId);
         toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: JSON.stringify(result) });
       } else {
         toolResults.push({

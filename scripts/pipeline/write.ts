@@ -120,12 +120,17 @@ export function pickReminderParent(
  * the same real-world thing — the pool cross-email dedupe reasons over. */
 async function fetchDuplicateCandidates(
   supabase: ReturnType<typeof getSupabaseClient>,
+  householdId: string,
   item: ExtractedItem,
   meta: MessageMeta
 ): Promise<ExistingEntry[]> {
   if (!item.date || item.kind === "reminder") return [];
 
-  let query = supabase.from("entries").select(DEDUPE_COLS).neq("status", "dismissed");
+  let query = supabase
+    .from("entries")
+    .select(DEDUPE_COLS)
+    .eq("household_id", householdId)
+    .neq("status", "dismissed");
   if (item.kind === "task") {
     query = query
       .eq("kind", "task")
@@ -148,6 +153,7 @@ async function fetchDuplicateCandidates(
 export async function writeExtractedItems(
   items: ExtractedItem[],
   meta: MessageMeta,
+  householdId: string,
   familyMembers: FamilyMember[],
   emailDomains: MemberEmailDomain[],
   arrivalRules: ArrivalBufferRule[]
@@ -208,6 +214,7 @@ export async function writeExtractedItems(
     const { data, error } = await supabase
       .from("entries")
       .insert({
+        household_id: householdId,
         kind,
         title: item.title,
         subject_member_id: subjectMemberId,
@@ -236,7 +243,7 @@ export async function writeExtractedItems(
     if (data && subjectMemberId && !subject?.isAdult) {
       const { error: ownerErr } = await supabase
         .from("entry_owners")
-        .insert({ entry_id: data.id, family_member_id: subjectMemberId });
+        .insert({ entry_id: data.id, family_member_id: subjectMemberId, household_id: householdId });
       if (ownerErr) throw ownerErr;
     }
 
@@ -257,13 +264,17 @@ export async function writeExtractedItems(
       item.kind === "advisory"
         ? null
         : resolvePerson(item.person_hint, domainMemberId, familyMembers);
-    const candidates = await fetchDuplicateCandidates(supabase, item, meta);
+    const candidates = await fetchDuplicateCandidates(supabase, householdId, item, meta);
     const { certain, maybes } = triageCandidates(item, candidates, subjectId);
     const dupe = certain ?? (maybes.length ? await llmDisambiguate(item, maybes) : null);
 
     if (dupe) {
       const { patch } = buildMergePatch(dupe, item, meta, subjectId);
-      const { error } = await supabase.from("entries").update(patch).eq("id", dupe.id);
+      const { error } = await supabase
+        .from("entries")
+        .update(patch)
+        .eq("id", dupe.id)
+        .eq("household_id", householdId);
       if (error) throw error;
       merged++;
       // A sibling reminder from this same email can still attach to the survivor.

@@ -31,11 +31,12 @@ function mapTodo(row: EntryRowWithOwners): Todo {
  * so those lists can reuse EventRow/EntryDetailsModal for click-to-details
  * (owner, category, additional context, visible to, history) instead of a
  * parallel todo-only detail view. */
-export async function getTodos(personId?: string | null): Promise<CalendarEvent[]> {
+export async function getTodos(householdId: string, personId?: string | null): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
   let query = supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("kind", "task")
     .order("created_at");
   if (personId && personId !== "all") {
@@ -46,11 +47,12 @@ export async function getTodos(personId?: string | null): Promise<CalendarEvent[
   return data.map(mapEvent);
 }
 
-export async function getIncompleteTodos(limit: number): Promise<CalendarEvent[]> {
+export async function getIncompleteTodos(householdId: string, limit: number): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("kind", "task")
     .is("completed_at", null)
     .order("created_at")
@@ -68,12 +70,13 @@ export async function getIncompleteTodos(limit: number): Promise<CalendarEvent[]
  * CalendarEvent-shaped (not the thin `Todo`) so the deadline notifications
  * built from these can open the same EntryDetailsModal as everywhere else,
  * instead of only linking off to the full /todo list. */
-export const getUrgentTodos = cache(async (): Promise<CalendarEvent[]> => {
+export const getUrgentTodos = cache(async (householdId: string): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const today = format(new Date(), "yyyy-MM-dd");
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("kind", "task")
     .is("completed_at", null)
     .neq("status", "dismissed")
@@ -89,11 +92,12 @@ export const getUrgentTodos = cache(async (): Promise<CalendarEvent[]> => {
  * approval badge matches the /review list — see getPendingReviewEntries.
  * A task with no due date never expires. Overdue-but-actionable tasks still
  * surface via getUrgentTodos, which is deliberately independent of this. */
-export const getPendingReviewTodos = cache(async (): Promise<Todo[]> => {
+export const getPendingReviewTodos = cache(async (householdId: string): Promise<Todo[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("kind", "task")
     .eq("status", "pending_review")
     .order("created_at")

@@ -6,6 +6,7 @@ import { buildEntryRows } from "@/lib/events/recurrence";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getMemberDetails } from "@/lib/data/memberDetails";
+import { requireHousehold } from "@/lib/actions/requireHousehold";
 import { inferArrivalAt } from "@/lib/arrival";
 import type { EntryInput, EntryKind, SourceDetail, SourceType } from "@/lib/types";
 
@@ -30,9 +31,12 @@ function validate(input: EntryInput): string | null {
 /** Fills in an inferred arrival time when the caller (pipeline / chat)
  * didn't set one explicitly. The EntryForm sends an explicit
  * `arrivalSource`, so this only kicks in for non-UI paths. */
-async function resolveArrival(input: EntryInput): Promise<EntryInput> {
+async function resolveArrival(householdId: string, input: EntryInput): Promise<EntryInput> {
   if (input.arrivalSource || input.arrivalAt || input.kind !== "event") return input;
-  const [members, rules] = await Promise.all([getFamilyMembers(), getArrivalBufferRules()]);
+  const [members, rules] = await Promise.all([
+    getFamilyMembers(householdId),
+    getArrivalBufferRules(householdId),
+  ]);
   const subject = members.find((m) => m.id === input.subjectMemberId);
 
   // A bound activity's own buffer wins over the category rules.
@@ -59,14 +63,14 @@ async function resolveArrival(input: EntryInput): Promise<EntryInput> {
   return arrivalAt ? { ...input, arrivalAt, arrivalSource: "inferred" } : input;
 }
 
-async function syncOwners(entryIds: string[], ownerMemberIds: string[]): Promise<void> {
+async function syncOwners(householdId: string, entryIds: string[], ownerMemberIds: string[]): Promise<void> {
   if (entryIds.length === 0) return;
   const supabase = getSupabaseClient();
   await supabase.from("entry_owners").delete().in("entry_id", entryIds);
   const uniqueOwners = [...new Set(ownerMemberIds)];
   if (uniqueOwners.length === 0) return;
   const rows = entryIds.flatMap((entry_id) =>
-    uniqueOwners.map((family_member_id) => ({ entry_id, family_member_id }))
+    uniqueOwners.map((family_member_id) => ({ entry_id, family_member_id, household_id: householdId }))
   );
   const { error } = await supabase.from("entry_owners").insert(rows);
   if (error) throw error;
@@ -76,16 +80,18 @@ export async function createEntry(
   rawInput: EntryInput,
   opts: { sourceType?: SourceType; sourceDetail?: SourceDetail; status?: "confirmed" | "pending_review" } = {}
 ): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const err = validate(rawInput);
   if (err) return { error: err };
 
-  const input = await resolveArrival(rawInput);
+  const input = await resolveArrival(household.householdId, rawInput);
   const rows = buildEntryRows({
     input,
     sourceType: opts.sourceType ?? "manual",
     sourceDetail: opts.sourceDetail,
     status: opts.status,
-  });
+  }).map((row) => ({ ...row, household_id: household.householdId }));
 
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.from("entries").insert(rows).select("id");
@@ -93,6 +99,7 @@ export async function createEntry(
 
   try {
     await syncOwners(
+      household.householdId,
       (data ?? []).map((r) => r.id),
       input.ownerMemberIds
     );
@@ -105,9 +112,11 @@ export async function createEntry(
 }
 
 export async function updateEntry(id: string, rawInput: EntryInput): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const err = validate(rawInput);
   if (err) return { error: err };
-  const input = await resolveArrival(rawInput);
+  const input = await resolveArrival(household.householdId, rawInput);
 
   const supabase = getSupabaseClient();
   const { error } = await supabase
@@ -132,11 +141,12 @@ export async function updateEntry(id: string, rawInput: EntryInput): Promise<{ e
       // status is owned by the review flow, not field edits.
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
 
   try {
-    await syncOwners([id], input.ownerMemberIds);
+    await syncOwners(household.householdId, [id], input.ownerMemberIds);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to set owners." };
   }
@@ -148,13 +158,21 @@ export async function updateEntry(id: string, rawInput: EntryInput): Promise<{ e
 /** Hard-delete. Does NOT revalidate — the caller shows a confirmation
  * step and calls router.refresh() on dismiss (see EntryDetailsModal). */
 export async function deleteEntry(id: string): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("entries").delete().eq("id", id);
+  const { error } = await supabase
+    .from("entries")
+    .delete()
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   return {};
 }
 
 export async function toggleTaskComplete(id: string, completed: boolean): Promise<void> {
+  const household = await requireHousehold();
+  if ("error" in household) throw new Error(household.error);
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("entries")
@@ -162,27 +180,34 @@ export async function toggleTaskComplete(id: string, completed: boolean): Promis
       completed_at: completed ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) throw error;
   revalidateEntryViews();
 }
 
 export async function confirmEntry(id: string): Promise<void> {
+  const household = await requireHousehold();
+  if ("error" in household) throw new Error(household.error);
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("entries")
     .update({ status: "confirmed", updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) throw error;
   revalidateEntryViews();
 }
 
 export async function dismissEntry(id: string): Promise<void> {
+  const household = await requireHousehold();
+  if ("error" in household) throw new Error(household.error);
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("entries")
     .update({ status: "dismissed", updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) throw error;
   revalidateEntryViews();
 }
@@ -197,11 +222,14 @@ export async function dismissEntry(id: string): Promise<void> {
  * row stays coherent; the reviewer can fix specifics via Edit afterward.
  */
 export async function reclassifyEntry(id: string, kind: EntryKind): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
   const { data: current, error: readErr } = await supabase
     .from("entries")
     .select("starts_at, due_at")
     .eq("id", id)
+    .eq("household_id", household.householdId)
     .single();
   if (readErr) return { error: readErr.message };
 
@@ -246,7 +274,11 @@ export async function reclassifyEntry(id: string, kind: EntryKind): Promise<{ er
     patch.linked_entry_id = null;
   }
 
-  const { error } = await supabase.from("entries").update(patch).eq("id", id);
+  const { error } = await supabase
+    .from("entries")
+    .update(patch)
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
 
   if (kind === "advisory" || kind === "reminder") {

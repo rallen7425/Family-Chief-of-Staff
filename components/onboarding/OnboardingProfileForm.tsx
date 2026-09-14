@@ -11,11 +11,11 @@ const INPUT_CLASS =
  * the plan doc: the account holder's own identity, plus an inline
  * optional household-name field. Matches the design canvas's
  * OnboardingProfile artboard, minus the optional "Connect Gmail &
- * Calendar" card — deliberately deferred: it would need to identify "who's
- * connecting" from this real session, but the existing connector flow
- * (app/api/connectors/google/start) still resolves that from the
- * fcos_active_member device cookie, a different identity source. Wiring
- * that correctly is separate work, not part of this phase. */
+ * Calendar" card — still deliberately deferred (not part of this phase),
+ * though the identity mismatch that originally motivated deferring it is
+ * gone: the connector flow (app/api/connectors/google/start) now resolves
+ * "who's connecting" from the real signed-in session (lib/currentMember.ts),
+ * same as everywhere else. */
 export function OnboardingProfileForm({ email }: { email: string }) {
   const [name, setName] = useState("");
   const [birthday, setBirthday] = useState("");

@@ -169,6 +169,7 @@ export function celebrationMessage(result: CompletionResult): string {
  * not a real DB transaction, but there's no existing RPC precedent here.
  */
 export async function completeChore(
+  householdId: string,
   chore: Chore,
   familyMemberId: string,
   status: "complete" | "partial",
@@ -181,6 +182,7 @@ export async function completeChore(
   const { error: insertError } = await supabase.from("chore_completions").insert({
     chore_id: chore.id,
     family_member_id: familyMemberId,
+    household_id: householdId,
     completed_on: dateStr,
     status,
     points_awarded: pointsAwarded,
@@ -209,6 +211,7 @@ export async function completeChore(
     .from("member_points")
     .upsert({
       family_member_id: familyMemberId,
+      household_id: householdId,
       balance,
       current_streak: currentStreak,
       longest_streak: longestStreak,
@@ -242,6 +245,7 @@ export interface ClaimResult {
  * by completeChore) — safe to .update() rather than .upsert().
  */
 export async function claimGoal(
+  householdId: string,
   goalId: string,
   familyMemberId: string,
   pointsNeeded: number,
@@ -271,6 +275,7 @@ export async function claimGoal(
     .insert({
       goal_id: goalId,
       family_member_id: familyMemberId,
+      household_id: householdId,
       points_spent: pointsNeeded,
       status,
       resolved_at: needsApproval ? null : new Date().toISOString(),
@@ -289,6 +294,7 @@ export async function claimGoal(
  * safe .update().
  */
 export async function resolveGoalClaim(
+  householdId: string,
   claimId: string,
   decision: "achieved" | "denied"
 ): Promise<{ error?: string }> {
@@ -297,6 +303,7 @@ export async function resolveGoalClaim(
     .from("goal_claims")
     .select("family_member_id, points_spent, status")
     .eq("id", claimId)
+    .eq("household_id", householdId)
     .single();
   if (readError) return { error: readError.message };
   if (claim.status !== "pending") return { error: "This request was already resolved." };
@@ -319,7 +326,8 @@ export async function resolveGoalClaim(
   const { error: updateError } = await supabase
     .from("goal_claims")
     .update({ status: decision, resolved_at: new Date().toISOString() })
-    .eq("id", claimId);
+    .eq("id", claimId)
+    .eq("household_id", householdId);
   if (updateError) return { error: updateError.message };
 
   return {};

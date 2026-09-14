@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { google } from "googleapis";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getActiveMember } from "@/lib/activeMember";
-import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { encryptToken, encodeHexBytea } from "@/lib/security/tokenCrypto";
 import { OAUTH_STATE_COOKIE } from "../start/route";
 
@@ -34,11 +33,12 @@ export async function GET(request: Request) {
     return response(redirectToProfile(request, { connectError: "invalid_state" }));
   }
 
-  const activeMember = await getActiveMember(await getFamilyMembers());
+  const activeMember = await getCurrentMember();
   if (!activeMember) {
     return response(redirectToProfile(request, { connectError: "not_signed_in" }));
   }
   const familyMemberId = activeMember.id;
+  const householdId = activeMember.householdId;
 
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
@@ -105,6 +105,7 @@ export async function GET(request: Request) {
     } else {
       const { error } = await supabase.from("email_connections").insert({
         family_member_id: familyMemberId,
+        household_id: householdId,
         provider: "google",
         external_account_email: email,
         status: "active",

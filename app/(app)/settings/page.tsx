@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { User, Users, Mail, Settings, Repeat } from "lucide-react";
+import { User, Users, Mail, Settings } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { SettingsRowContent, settingsRowClass } from "@/components/settings/SettingsRow";
 import { LogOutRow } from "@/components/settings/LogOutRow";
 import { PrivacyRow } from "@/components/settings/PrivacyRow";
@@ -9,9 +9,10 @@ import { PrivacyRow } from "@/components/settings/PrivacyRow";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
-  const isHoH = activeMember?.isHeadOfHousehold ?? false;
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const familyMembers = await getFamilyMembers(activeMember.householdId);
+  const isHoH = activeMember.isHeadOfHousehold;
 
   return (
     <>
@@ -66,15 +67,6 @@ export default async function SettingsPage() {
       </div>
 
       <div className="bg-surface rounded-card overflow-hidden shadow-sm shadow-black/5">
-        <Link href="/settings/switch" className={settingsRowClass}>
-          <SettingsRowContent
-            icon={Repeat}
-            iconBg="#EEF2FB"
-            iconColor="#3B6FE5"
-            label="Switch Account"
-            sub={activeMember ? `Currently ${activeMember.name}` : "Choose a profile"}
-          />
-        </Link>
         <LogOutRow />
       </div>
     </>

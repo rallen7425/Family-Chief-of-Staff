@@ -37,11 +37,12 @@ export async function getMemberDetails(memberId: string): Promise<MemberDetail[]
  * inherit its arrival buffer. cache()d: several pages need it per request.
  */
 export const getActivitiesByMember = cache(
-  async (): Promise<Record<string, MemberDetail[]>> => {
+  async (householdId: string): Promise<Record<string, MemberDetail[]>> => {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("member_details")
       .select("*")
+      .eq("household_id", householdId)
       .eq("ignored", false)
       .order("created_at")
       .returns<MemberDetailRow[]>();

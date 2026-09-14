@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getMemberDetails } from "@/lib/data/memberDetails";
 import { AdditionalContextDetails } from "@/components/profile/AdditionalContextDetails";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyProfileDetailsPage() {
-  const familyMembers = await getFamilyMembers();
-  const member = await getActiveMember(familyMembers);
+  const member = await getCurrentMember();
   if (!member) return null;
   const items = await getMemberDetails(member.id);
 

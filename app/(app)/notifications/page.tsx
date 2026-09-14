@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getRankedNotifications } from "@/lib/notifications";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { getLinkableOptions } from "@/lib/data/events";
@@ -11,13 +12,17 @@ import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const householdId = activeMember.householdId;
+
   const [{ reviewNudge, important, more }, familyMembers, arrivalRules, activitiesByMember, linkables] =
     await Promise.all([
-      getRankedNotifications(),
-      getFamilyMembers(),
-      getArrivalBufferRules(),
-      getActivitiesByMember(),
-      getLinkableOptions(),
+      getRankedNotifications(householdId),
+      getFamilyMembers(householdId),
+      getArrivalBufferRules(householdId),
+      getActivitiesByMember(householdId),
+      getLinkableOptions(householdId),
     ]);
   const isEmpty = !reviewNudge && important.length === 0 && more.length === 0;
 

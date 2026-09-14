@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { effectiveIsAdult } from "@/lib/family";
 import { getMemberPoints } from "@/lib/data/chores";
 import { getGoals, getGoalClaimsForMember, getPendingGoalClaims } from "@/lib/data/goals";
@@ -22,15 +22,16 @@ function BackLink() {
 }
 
 export default async function GoalsPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
+  const activeMember = await getCurrentMember();
   if (!activeMember) return null;
+  const householdId = activeMember.householdId;
+  const familyMembers = await getFamilyMembers(householdId);
 
   const kids = familyMembers.filter((m) => !effectiveIsAdult(m));
-  const goals = await getGoals();
+  const goals = await getGoals(householdId);
 
   if (effectiveIsAdult(activeMember)) {
-    const pending = await getPendingGoalClaims();
+    const pending = await getPendingGoalClaims(householdId);
     const memberById = new Map(familyMembers.map((m) => [m.id, m]));
     const goalById = new Map(goals.map((g) => [g.id, g]));
     const pendingClaims = pending.map((claim) => ({

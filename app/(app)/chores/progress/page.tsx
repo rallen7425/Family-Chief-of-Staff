@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getCompletionsForMember, getMemberPoints } from "@/lib/data/chores";
 import { MyProgress } from "@/components/chores/MyProgress";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProgressPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
+  const activeMember = await getCurrentMember();
   if (!activeMember) return null;
 
   const [completions, points] = await Promise.all([

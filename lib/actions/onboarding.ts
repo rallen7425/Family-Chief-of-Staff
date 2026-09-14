@@ -121,7 +121,6 @@ export async function addHouseholdMember(input: {
     phone: null,
     school: null,
     grade: null,
-    householdId: self.householdId,
   };
   return saveFamilyMember(memberInput);
 }

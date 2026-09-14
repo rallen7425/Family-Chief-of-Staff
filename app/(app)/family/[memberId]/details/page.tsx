@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getMemberDetails } from "@/lib/data/memberDetails";
 import { AdditionalContextDetails } from "@/components/profile/AdditionalContextDetails";
 
@@ -12,9 +12,9 @@ export default async function FamilyMemberDetailsPage(
   props: PageProps<"/family/[memberId]/details">
 ) {
   const { memberId } = await props.params;
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
+  const activeMember = await getCurrentMember();
   if (!activeMember?.isHeadOfHousehold) redirect("/profile");
+  const familyMembers = await getFamilyMembers(activeMember.householdId);
 
   const member = familyMembers.find((m) => m.id === memberId);
   if (!member) notFound();

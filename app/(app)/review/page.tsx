@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { getPendingReviewEntries } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { ReviewList, type ReviewGroup, type ReviewGroupItem } from "@/components/review/ReviewList";
@@ -49,11 +50,15 @@ function toItem(entry: CalendarEvent, familyMembers: FamilyMember[]): ReviewGrou
 }
 
 export default async function ReviewPage() {
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const householdId = activeMember.householdId;
+
   const [entries, familyMembers, arrivalRules, activitiesByMember] = await Promise.all([
-    getPendingReviewEntries(),
-    getFamilyMembers(),
-    getArrivalBufferRules(),
-    getActivitiesByMember(),
+    getPendingReviewEntries(householdId),
+    getFamilyMembers(householdId),
+    getArrivalBufferRules(householdId),
+    getActivitiesByMember(householdId),
   ]);
 
   const groups = new Map<string, ReviewGroup>();

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getMemberDetails } from "@/lib/data/memberDetails";
 import { getEmailConnectionsByMember } from "@/lib/data/emailConnections";
 import { initialsOf } from "@/lib/family";
@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MyProfilePage(props: PageProps<"/profile">) {
   const searchParams = await props.searchParams;
-  const familyMembers = await getFamilyMembers();
-  const member = await getActiveMember(familyMembers);
+  const member = await getCurrentMember();
 
   if (!member) {
     return (
@@ -24,6 +23,7 @@ export default async function MyProfilePage(props: PageProps<"/profile">) {
     );
   }
 
+  const familyMembers = await getFamilyMembers(member.householdId);
   const [details, connections] = await Promise.all([
     getMemberDetails(member.id),
     getEmailConnectionsByMember(member.id),

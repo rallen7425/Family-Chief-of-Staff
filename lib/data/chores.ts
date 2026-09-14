@@ -26,24 +26,28 @@ function mapChore(row: ChoreRowWithAssignees): Chore {
 
 /** Wrapped in cache() since the Parent Dashboard, Chore Builder, and Today's
  * Chores can all need the full catalog within one request. */
-export const getChores = cache(async (): Promise<Chore[]> => {
+export const getChores = cache(async (householdId: string): Promise<Chore[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("chores")
     .select(SELECT_WITH_ASSIGNEES)
+    .eq("household_id", householdId)
     .order("created_at")
     .returns<ChoreRowWithAssignees[]>();
   if (error) throw error;
   return data.map(mapChore);
 });
 
-export async function getChoreById(id: string): Promise<Chore | null> {
-  const chores = await getChores();
+export async function getChoreById(householdId: string, id: string): Promise<Chore | null> {
+  const chores = await getChores(householdId);
   return chores.find((c) => c.id === id) ?? null;
 }
 
-export async function getActiveChoresForMember(familyMemberId: string): Promise<Chore[]> {
-  const chores = await getChores();
+export async function getActiveChoresForMember(
+  householdId: string,
+  familyMemberId: string
+): Promise<Chore[]> {
+  const chores = await getChores(householdId);
   return chores.filter((c) => c.active && c.assigneeMemberIds.includes(familyMemberId));
 }
 

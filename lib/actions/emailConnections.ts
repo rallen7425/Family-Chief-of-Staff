@@ -2,19 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
-import { getActiveMember } from "@/lib/activeMember";
-import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getEmailConnectionById } from "@/lib/data/emailConnections";
 import { decryptToken, decodeHexBytea } from "@/lib/security/tokenCrypto";
 
-/** Every connector action is scoped to whoever the app currently resolves
- * as "using this device" — the same resolution the rest of the app uses
- * (the fcos_active_member cookie if set, else a sensible fallback like the
- * first head of household), not just the raw cookie value. Not a real
- * permission system; just enough to stop one member's UI from accidentally
- * acting on a sibling's connection. */
+/** Every connector action is scoped to the real signed-in member
+ * (lib/currentMember.ts) — stops one member's UI from acting on a
+ * sibling's (or another household's) connection. */
 async function assertOwnership(connectionId: string) {
-  const activeMember = await getActiveMember(await getFamilyMembers());
+  const activeMember = await getCurrentMember();
   if (!activeMember) return { error: "Not signed in." } as const;
   const connection = await getEmailConnectionById(connectionId);
   if (!connection) return { error: "Connection not found." } as const;

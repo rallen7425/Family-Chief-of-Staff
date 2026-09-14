@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { subDays, format } from "date-fns";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 import { effectiveIsAdult } from "@/lib/family";
 import { getCompletionsForMember, getAllMemberPoints } from "@/lib/data/chores";
 import { Leaderboard } from "@/components/chores/Leaderboard";
@@ -9,7 +10,9 @@ import { Leaderboard } from "@/components/chores/Leaderboard";
 export const dynamic = "force-dynamic";
 
 export default async function LeaderboardPage() {
-  const familyMembers = await getFamilyMembers();
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const familyMembers = await getFamilyMembers(activeMember.householdId);
   const kids = familyMembers.filter((m) => !effectiveIsAdult(m));
 
   const weekAgo = format(subDays(new Date(), 7), "yyyy-MM-dd");

@@ -113,7 +113,11 @@ interface QueryScheduleInput {
   include_todos?: boolean;
 }
 
-export async function executeQuerySchedule(rawInput: unknown, familyMembers: FamilyMember[]) {
+export async function executeQuerySchedule(
+  rawInput: unknown,
+  familyMembers: FamilyMember[],
+  householdId: string
+) {
   const input = rawInput as QueryScheduleInput;
   const start = input.start_date ? startOfDay(parseDateParam(input.start_date)) : startOfDay(new Date());
   const end = input.end_date ? addDays(startOfDay(parseDateParam(input.end_date)), 1) : addDays(start, 90);
@@ -131,12 +135,12 @@ export async function executeQuerySchedule(rawInput: unknown, familyMembers: Fam
   // visibility rule (a kid's event shows under either parent's filter) —
   // right for that page, too broad for chat, which should answer only
   // with this person's own events. Fetch unfiltered and match strictly.
-  const allEvents = await getEventsInRange(start, end);
+  const allEvents = await getEventsInRange(householdId, start, end);
   const events = person ? allEvents.filter((event) => event.familyMemberId === person.id) : allEvents;
 
   let todos: Awaited<ReturnType<typeof getTodos>> = [];
   if (input.include_todos !== false) {
-    todos = await getTodos(personId);
+    todos = await getTodos(householdId, personId);
   }
 
   return {

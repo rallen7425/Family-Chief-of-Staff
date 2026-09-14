@@ -250,16 +250,16 @@ export function assembleNotifications(sources: NotificationSources, now: Date): 
 // ── data entry point ───────────────────────────────────────────────────────
 
 /** Wrapped in cache() — the Today page and /notifications both call it. */
-export const getRankedNotifications = cache(async (): Promise<RankedNotifications> => {
+export const getRankedNotifications = cache(async (householdId: string): Promise<RankedNotifications> => {
   const [pendingEvents, pendingTodos, advisories, actionsSoon, urgentTodos, systemItems, dismissed] =
     await Promise.all([
-      getPendingReviewEvents(),
-      getPendingReviewTodos(),
-      getActiveAdvisories(),
-      getActionsSoon(ACTION_WINDOW_HOURS),
-      getUrgentTodos(),
-      getActiveKeepInMindItems(),
-      getNotificationDismissals(),
+      getPendingReviewEvents(householdId),
+      getPendingReviewTodos(householdId),
+      getActiveAdvisories(householdId),
+      getActionsSoon(householdId, ACTION_WINDOW_HOURS),
+      getUrgentTodos(householdId),
+      getActiveKeepInMindItems(householdId),
+      getNotificationDismissals(householdId),
     ]);
 
   return assembleNotifications(

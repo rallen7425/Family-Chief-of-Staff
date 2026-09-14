@@ -9,11 +9,12 @@ export interface MemberEmailDomain {
 /** Sender-domain → family member fallback rules (e.g. a kid's school
  * mailer), used when an email doesn't name a family member explicitly.
  * See scripts/pipeline/write.ts's resolvePerson(). */
-export async function getMemberEmailDomains(): Promise<MemberEmailDomain[]> {
+export async function getMemberEmailDomains(householdId: string): Promise<MemberEmailDomain[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("member_email_domains")
     .select("*")
+    .eq("household_id", householdId)
     .returns<MemberEmailDomainRow[]>();
   if (error) throw error;
   return data.map((row) => ({ familyMemberId: row.family_member_id, domain: row.domain }));

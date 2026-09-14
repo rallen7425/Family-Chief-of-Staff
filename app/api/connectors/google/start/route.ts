@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { google } from "googleapis";
-import { getActiveMember } from "@/lib/activeMember";
-import { getFamilyMembers } from "@/lib/data/familyMembers";
+import { getCurrentMember } from "@/lib/currentMember";
 
 export const OAUTH_STATE_COOKIE = "fcos_oauth_state";
 
 /**
- * Starts the in-app Google OAuth consent flow. "Who is connecting" is
- * whoever the app currently resolves as using this device — the same
- * no-auth trust boundary as every other write in this app, extended to a
- * new surface rather than inventing a new one. No query params needed.
+ * Starts the in-app Google OAuth consent flow. "Who is connecting" is the
+ * real signed-in member (lib/currentMember.ts) — no query params needed.
  */
 export async function GET(request: Request) {
-  const activeMember = await getActiveMember(await getFamilyMembers());
+  const activeMember = await getCurrentMember();
   if (!activeMember) {
-    return NextResponse.redirect(new URL("/settings/switch", request.url));
+    return NextResponse.redirect(new URL("/signin", request.url));
   }
 
   const clientId = process.env.GMAIL_OAUTH_CLIENT_ID;

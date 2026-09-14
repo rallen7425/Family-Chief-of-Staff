@@ -89,6 +89,7 @@ async function processMessage(
   emailDomains: MemberEmailDomain[],
   arrivalRules: ArrivalBufferRule[]
 ): Promise<MessageOutcome> {
+  const householdId = connection.householdId;
   const supabase = getSupabaseClient();
   try {
     const message = await provider.fetchMessageDetail(connection, messageId);
@@ -128,6 +129,7 @@ async function processMessage(
         accountEmail: connection.externalAccountEmail,
         connectionId: connection.id,
       },
+      householdId,
       familyMembers,
       emailDomains,
       arrivalRules
@@ -178,13 +180,17 @@ function isAuthFailure(err: unknown): boolean {
 
 async function processConnection(
   connectionRow: Parameters<typeof toEmailConnection>[0],
-  familyMembers: FamilyMember[],
-  emailDomains: MemberEmailDomain[],
-  arrivalRules: ArrivalBufferRule[],
   result: PipelineResult
 ): Promise<void> {
   const supabase = getSupabaseClient();
   const connection = toEmailConnection(connectionRow);
+  const [familyMembers, emailDomains, arrivalRules] = await withRetry(() =>
+    Promise.all([
+      getFamilyMembers(connection.householdId),
+      getMemberEmailDomains(connection.householdId),
+      getArrivalBufferRules(connection.householdId),
+    ])
+  );
   const provider = providers[connection.provider];
   if (!provider) {
     result.errors++;
@@ -266,14 +272,7 @@ async function processConnection(
 }
 
 export async function runEmailScanPipeline(): Promise<PipelineResult> {
-  const [connections, familyMembers, emailDomains, arrivalRules] = await withRetry(() =>
-    Promise.all([
-      getActiveEmailConnections(),
-      getFamilyMembers(),
-      getMemberEmailDomains(),
-      getArrivalBufferRules(),
-    ])
-  );
+  const connections = await withRetry(() => getActiveEmailConnections());
 
   const result: PipelineResult = {
     scanned: 0,
@@ -288,7 +287,7 @@ export async function runEmailScanPipeline(): Promise<PipelineResult> {
   };
 
   for (const connectionRow of connections) {
-    await processConnection(connectionRow, familyMembers, emailDomains, arrivalRules, result);
+    await processConnection(connectionRow, result);
   }
 
   return result;

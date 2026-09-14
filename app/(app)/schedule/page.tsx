@@ -15,7 +15,7 @@ import { getEventsInRange, getLinkableOptions } from "@/lib/data/events";
 import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { effectiveIsAdult } from "@/lib/family";
 import { parseDateParam, formatDateParam } from "@/lib/dateParam";
 import type { CalendarEvent, ScheduleViewMode } from "@/lib/types";
@@ -49,11 +49,15 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   const explicitPerson = typeof searchParams.person === "string" ? searchParams.person : undefined;
   const date = parseDateParam(typeof searchParams.date === "string" ? searchParams.date : undefined);
 
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null;
+  const householdId = activeMember.householdId;
+
   const [familyMembers, arrivalRules, linkableOptions, activitiesByMember] = await Promise.all([
-    getFamilyMembers(),
-    getArrivalBufferRules(),
-    getLinkableOptions(),
-    getActivitiesByMember(),
+    getFamilyMembers(householdId),
+    getArrivalBufferRules(householdId),
+    getLinkableOptions(householdId),
+    getActivitiesByMember(householdId),
   ]);
 
   // No explicit ?person= yet (a fresh nav, not a filter-chip click): default a
@@ -62,11 +66,8 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
   // (the household manager) still defaults to "All" since seeing everyone,
   // including the other adult's private events, is the point for them.
   let person = explicitPerson ?? "all";
-  if (!explicitPerson) {
-    const activeMember = await getActiveMember(familyMembers);
-    if (activeMember && !effectiveIsAdult(activeMember)) {
-      person = activeMember.id;
-    }
+  if (!explicitPerson && !effectiveIsAdult(activeMember)) {
+    person = activeMember.id;
   }
 
   function buildHref(overrides: { view?: ScheduleViewMode; date?: Date; person?: string }) {
@@ -101,7 +102,7 @@ export default async function SchedulePage(props: PageProps<"/schedule">) {
     labelEnd = endOfMonth(date);
   }
 
-  const events = await getEventsInRange(rangeStart, rangeEnd, person);
+  const events = await getEventsInRange(householdId, rangeStart, rangeEnd, person);
 
   let prevDate: Date;
   let nextDate: Date;

@@ -22,11 +22,12 @@ interface BusyEventRow {
 /** True when `familyMemberId` is inside a scheduled event right now — from
  * its arrival-buffer window (if set) through its end (or, with no end, just
  * through its start — "getting ready to leave" still counts as busy). */
-async function isMemberBusyNow(familyMemberId: string, now: Date): Promise<boolean> {
+async function isMemberBusyNow(householdId: string, familyMemberId: string, now: Date): Promise<boolean> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select("starts_at, ends_at, arrival_at, subject_member_id, entry_owners(family_member_id)")
+    .eq("household_id", householdId)
     .eq("kind", "event")
     .neq("status", "dismissed")
     .gte("starts_at", startOfDay(now).toISOString())
@@ -52,16 +53,17 @@ async function isMemberBusyNow(familyMemberId: string, now: Date): Promise<boole
  * card is fully absent, not an empty state — see RightNowCard).
  */
 export async function getRightNowChore(
+  householdId: string,
   member: FamilyMember,
   now: Date = new Date()
 ): Promise<RightNowChore | null> {
   // Adults never see a Right Now card, regardless of time.
   if (effectiveIsAdult(member)) return null;
   if (isSchoolHours(now)) return null;
-  if (await isMemberBusyNow(member.id, now)) return null;
+  if (await isMemberBusyNow(householdId, member.id, now)) return null;
 
   const [chores, completions, points] = await Promise.all([
-    getActiveChoresForMember(member.id),
+    getActiveChoresForMember(householdId, member.id),
     getCompletionsForMember(member.id),
     getMemberPoints(member.id),
   ]);

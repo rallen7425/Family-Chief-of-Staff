@@ -31,6 +31,7 @@ export interface FamilyMemberRow {
 export interface MemberDetailRow {
   id: string;
   family_member_id: string;
+  household_id: string;
   label: string;
   value: string;
   fields: { label: string; value: string }[];
@@ -50,6 +51,7 @@ export interface MemberDetailRow {
  * replaced `events` + `todos` in the P1 redesign. */
 export interface EntryRow {
   id: string;
+  household_id: string;
   kind: EntryKind;
   title: string;
   notes: string | null;
@@ -84,10 +86,12 @@ export interface EntryRow {
 export interface EntryOwnerRow {
   entry_id: string;
   family_member_id: string;
+  household_id: string;
 }
 
 export interface KeepInMindRow {
   id: string;
+  household_id: string;
   body: string;
   icon: string | null;
   family_member_id: string | null;
@@ -96,14 +100,16 @@ export interface KeepInMindRow {
 
 export interface MemberEmailDomainRow {
   id: string;
+  household_id: string;
   family_member_id: string;
   domain: string;
 }
 
-/** `family_chief_of_staff.notification_dismissals` — household-wide
+/** `family_chief_of_staff.notification_dismissals` — per-household
  * "dismissed" state for a derived notification, keyed by its stable id. */
 export interface NotificationDismissalRow {
   notification_id: string;
+  household_id: string;
   dismissed_at: string;
 }
 
@@ -114,6 +120,7 @@ export interface NotificationDismissalRow {
 export interface EmailConnectionRow {
   id: string;
   family_member_id: string;
+  household_id: string;
   provider: "google" | "microsoft";
   external_account_email: string;
   status: "active" | "paused" | "needs_reconnect" | "disconnected";
@@ -133,6 +140,7 @@ export interface EmailConnectionRow {
 
 export interface ChoreRow {
   id: string;
+  household_id: string;
   title: string;
   points: number;
   frequency: ChoreFrequency;
@@ -147,10 +155,12 @@ export interface ChoreRow {
 export interface ChoreAssigneeRow {
   chore_id: string;
   family_member_id: string;
+  household_id: string;
 }
 
 export interface ChoreCompletionRow {
   id: string;
+  household_id: string;
   chore_id: string;
   family_member_id: string;
   completed_on: string;
@@ -161,6 +171,7 @@ export interface ChoreCompletionRow {
 
 export interface MemberPointsRow {
   family_member_id: string;
+  household_id: string;
   balance: number;
   current_streak: number;
   longest_streak: number;
@@ -169,6 +180,7 @@ export interface MemberPointsRow {
 
 export interface GoalRow {
   id: string;
+  household_id: string;
   name: string;
   points_needed: number;
   needs_approval: boolean;
@@ -179,10 +191,12 @@ export interface GoalRow {
 export interface GoalAvailabilityRow {
   goal_id: string;
   family_member_id: string;
+  household_id: string;
 }
 
 export interface GoalClaimRow {
   id: string;
+  household_id: string;
   goal_id: string;
   family_member_id: string;
   points_spent: number;

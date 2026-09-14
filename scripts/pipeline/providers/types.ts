@@ -7,6 +7,7 @@ import { decryptToken, decodeHexBytea } from "@/lib/security/tokenCrypto";
 export interface EmailConnection {
   id: string;
   familyMemberId: string;
+  householdId: string;
   provider: "google" | "microsoft";
   externalAccountEmail: string;
   refreshToken: string;
@@ -17,6 +18,7 @@ export function toEmailConnection(row: EmailConnectionRow): EmailConnection {
   return {
     id: row.id,
     familyMemberId: row.family_member_id,
+    householdId: row.household_id,
     provider: row.provider,
     externalAccountEmail: row.external_account_email,
     refreshToken: decryptToken(decodeHexBytea(row.refresh_token_enc)),

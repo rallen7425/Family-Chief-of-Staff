@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getChoreById } from "@/lib/data/chores";
+import { requireHousehold } from "@/lib/actions/requireHousehold";
 import { completeChore as writeCompletion, type CompletionResult } from "@/lib/chores";
 import type { ChoreFrequency, ChoreTimeWindow } from "@/lib/types";
 
@@ -38,18 +39,24 @@ function validate(input: ChoreInput): string | null {
   return null;
 }
 
-async function syncAssignees(choreId: string, assigneeMemberIds: string[]): Promise<void> {
+async function syncAssignees(
+  householdId: string,
+  choreId: string,
+  assigneeMemberIds: string[]
+): Promise<void> {
   const supabase = getSupabaseClient();
   await supabase.from("chore_assignees").delete().eq("chore_id", choreId);
   const unique = [...new Set(assigneeMemberIds)];
   if (unique.length === 0) return;
   const { error } = await supabase
     .from("chore_assignees")
-    .insert(unique.map((family_member_id) => ({ chore_id: choreId, family_member_id })));
+    .insert(unique.map((family_member_id) => ({ chore_id: choreId, family_member_id, household_id: householdId })));
   if (error) throw error;
 }
 
 export async function createChore(input: ChoreInput): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const err = validate(input);
   if (err) return { error: err };
 
@@ -57,6 +64,7 @@ export async function createChore(input: ChoreInput): Promise<{ error?: string }
   const { data, error } = await supabase
     .from("chores")
     .insert({
+      household_id: household.householdId,
       title: input.title.trim(),
       points: input.points,
       frequency: input.frequency,
@@ -71,7 +79,7 @@ export async function createChore(input: ChoreInput): Promise<{ error?: string }
   if (error) return { error: error.message };
 
   try {
-    await syncAssignees(data.id, input.assigneeMemberIds);
+    await syncAssignees(household.householdId, data.id, input.assigneeMemberIds);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to assign this chore." };
   }
@@ -81,6 +89,8 @@ export async function createChore(input: ChoreInput): Promise<{ error?: string }
 }
 
 export async function updateChore(id: string, input: ChoreInput): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const err = validate(input);
   if (err) return { error: err };
 
@@ -97,11 +107,12 @@ export async function updateChore(id: string, input: ChoreInput): Promise<{ erro
       is_pinned: input.isPinned,
       active: input.active,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
 
   try {
-    await syncAssignees(id, input.assigneeMemberIds);
+    await syncAssignees(household.householdId, id, input.assigneeMemberIds);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to assign this chore." };
   }
@@ -112,8 +123,14 @@ export async function updateChore(id: string, input: ChoreInput): Promise<{ erro
 
 /** Hard delete — chore_assignees/chore_completions cascade. */
 export async function deleteChore(id: string): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("chores").delete().eq("id", id);
+  const { error } = await supabase
+    .from("chores")
+    .delete()
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidateChoreViews();
   return {};
@@ -126,9 +143,11 @@ export async function completeChoreAction(
   familyMemberId: string,
   status: "complete" | "partial"
 ): Promise<CompletionResult | { error: string }> {
-  const chore = await getChoreById(choreId);
+  const household = await requireHousehold();
+  if ("error" in household) return household;
+  const chore = await getChoreById(household.householdId, choreId);
   if (!chore) return { error: "This chore no longer exists." };
-  const result = await writeCompletion(chore, familyMemberId, status);
+  const result = await writeCompletion(household.householdId, chore, familyMemberId, status);
   revalidateChoreViews();
   return result;
 }

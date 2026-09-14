@@ -67,6 +67,7 @@ function attachReminders(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 export async function getEventsInRange(
+  householdId: string,
   start: Date,
   end: Date,
   personId?: string | null
@@ -75,6 +76,7 @@ export async function getEventsInRange(
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
     // Unconfirmed (pending_review) entries stay on the calendar, tagged in
@@ -93,7 +95,7 @@ export async function getEventsInRange(
     // event shows for that kid + every adult) rather than a strict
     // assignee match. Whole-family entries (no subject) keep their
     // existing behavior — shown only under "All".
-    const familyMembers = await getFamilyMembers();
+    const familyMembers = await getFamilyMembers(householdId);
     events = events.filter(
       (event) => event.familyMemberId && isEventVisibleToViewer(event, personId, familyMembers)
     );
@@ -116,12 +118,16 @@ export async function getEventsInRange(
  * viewer's own Today screen show," not "filter down to just this person's
  * assigned items." Omitting it keeps the fully unfiltered household view
  * (no active member resolved, or a caller with no viewer concept). */
-export async function getTodaySchedulePreview(viewerId?: string | null): Promise<SchedulePreview> {
+export async function getTodaySchedulePreview(
+  householdId: string,
+  viewerId?: string | null
+): Promise<SchedulePreview> {
   const now = new Date();
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .in("kind", SCHEDULE_KINDS)
     .not("starts_at", "is", null)
     .neq("status", "dismissed")
@@ -133,7 +139,7 @@ export async function getTodaySchedulePreview(viewerId?: string | null): Promise
   let events = data.map(mapEvent);
 
   if (viewerId) {
-    const familyMembers = await getFamilyMembers();
+    const familyMembers = await getFamilyMembers(householdId);
     events = events.filter(
       (event) => !event.familyMemberId || isEventVisibleToViewer(event, viewerId, familyMembers)
     );
@@ -144,11 +150,12 @@ export async function getTodaySchedulePreview(viewerId?: string | null): Promise
 
 /** Confirmed advisories, for the notifications feed. Time-bounding (show
  * for ~24h from detection) is applied in lib/notifications.ts, not here. */
-export async function getActiveAdvisories(): Promise<CalendarEvent[]> {
+export async function getActiveAdvisories(householdId: string): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("kind", "advisory")
     .eq("status", "confirmed")
     .order("created_at", { ascending: false })
@@ -160,7 +167,7 @@ export async function getActiveAdvisories(): Promise<CalendarEvent[]> {
 /** Confirmed events/reminders whose start (or arrival time, if set) lands in
  * the next `withinHours` and haven't already ended — the "act on this soon"
  * notification source. */
-export async function getActionsSoon(withinHours: number): Promise<CalendarEvent[]> {
+export async function getActionsSoon(householdId: string, withinHours: number): Promise<CalendarEvent[]> {
   const now = new Date();
   const horizon = new Date(now.getTime() + withinHours * 60 * 60 * 1000);
   // Query a slightly wider window than the horizon so an entry whose
@@ -171,6 +178,7 @@ export async function getActionsSoon(withinHours: number): Promise<CalendarEvent
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .in("kind", ["event", "reminder"])
     .eq("status", "confirmed")
     .not("starts_at", "is", null)
@@ -191,11 +199,12 @@ export async function getActionsSoon(withinHours: number): Promise<CalendarEvent
 /** Wrapped in cache() since the root layout (notification badge) and the
  * Today page (approval summary line) both need this within one request.
  * Past-dated items are filtered out — see getPendingReviewEntries. */
-export const getPendingReviewEvents = cache(async (): Promise<CalendarEvent[]> => {
+export const getPendingReviewEvents = cache(async (householdId: string): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .in("kind", SCHEDULE_KINDS)
     .eq("status", "pending_review")
     .order("starts_at")
@@ -211,11 +220,12 @@ export const getPendingReviewEvents = cache(async (): Promise<CalendarEvent[]> =
  * Entries whose date has already passed are dropped — a scanned email
  * about last week's game isn't worth reviewing. They keep their
  * `pending_review` status in the DB; this is a view-time filter only. */
-export const getPendingReviewEntries = cache(async (): Promise<CalendarEvent[]> => {
+export const getPendingReviewEntries = cache(async (householdId: string): Promise<CalendarEvent[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("entries")
     .select(SELECT_WITH_OWNERS)
+    .eq("household_id", householdId)
     .eq("status", "pending_review")
     .order("created_at")
     .returns<EntryRowWithOwners[]>();
@@ -226,7 +236,10 @@ export const getPendingReviewEntries = cache(async (): Promise<CalendarEvent[]> 
 /** Events + tasks a reminder can be linked to via EntryForm's "About"
  * picker. Bounded to a sane window — yesterday through +90d — so the picker
  * is a short, relevant list rather than every entry ever scanned. */
-export async function getLinkableEntries(now: Date = new Date()): Promise<CalendarEvent[]> {
+export async function getLinkableEntries(
+  householdId: string,
+  now: Date = new Date()
+): Promise<CalendarEvent[]> {
   const supabase = getSupabaseClient();
   const floor = startOfDay(subDays(now, 1));
   const ceil = endOfDay(addDays(now, 90));
@@ -236,6 +249,7 @@ export async function getLinkableEntries(now: Date = new Date()): Promise<Calend
     supabase
       .from("entries")
       .select(SELECT_WITH_OWNERS)
+      .eq("household_id", householdId)
       .in("kind", ["event", "advisory"])
       .neq("status", "dismissed")
       .gte("starts_at", floor.toISOString())
@@ -246,6 +260,7 @@ export async function getLinkableEntries(now: Date = new Date()): Promise<Calend
     supabase
       .from("entries")
       .select(SELECT_WITH_OWNERS)
+      .eq("household_id", householdId)
       .eq("kind", "task")
       .neq("status", "dismissed")
       .gte("due_at", floorDate)
@@ -267,8 +282,11 @@ export interface LinkableOption {
 /** The linkable list already shaped for EntryForm's picker. Shared by the
  * Schedule and Today pages so a reminder's "About" control looks the same
  * wherever it's opened from. */
-export async function getLinkableOptions(now: Date = new Date()): Promise<LinkableOption[]> {
-  const entries = await getLinkableEntries(now);
+export async function getLinkableOptions(
+  householdId: string,
+  now: Date = new Date()
+): Promise<LinkableOption[]> {
+  const entries = await getLinkableEntries(householdId, now);
   return entries.map((e) => {
     const anchor = e.kind === "task" ? e.dueDate : undefined;
     const when = anchor

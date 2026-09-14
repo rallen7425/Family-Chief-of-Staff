@@ -5,7 +5,7 @@ import { getFamilyMembers } from "@/lib/data/familyMembers";
 import { getArrivalBufferRules } from "@/lib/data/arrivalRules";
 import { getActivitiesByMember } from "@/lib/data/memberDetails";
 import { getRankedNotifications } from "@/lib/notifications";
-import { getActiveMember } from "@/lib/activeMember";
+import { getCurrentMember } from "@/lib/currentMember";
 import { getRightNowChore } from "@/lib/rightNow";
 import { KeepInMindCard } from "@/components/today/KeepInMindCard";
 import { ScheduleCard } from "@/components/today/ScheduleCard";
@@ -16,8 +16,11 @@ import { EntryEditingProvider } from "@/components/entries/EntryEditingContext";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const familyMembers = await getFamilyMembers();
-  const activeMember = await getActiveMember(familyMembers);
+  const activeMember = await getCurrentMember();
+  if (!activeMember) return null; // (app) layout always redirects with no signed-in member
+  const householdId = activeMember.householdId;
+
+  const familyMembers = await getFamilyMembers(householdId);
 
   const [
     notifications,
@@ -27,15 +30,15 @@ export default async function TodayPage() {
     linkables,
     activitiesByMember,
   ] = await Promise.all([
-    getRankedNotifications(),
-    getTodaySchedulePreview(activeMember?.id),
-    getIncompleteTodos(3),
-    getArrivalBufferRules(),
-    getLinkableOptions(),
-    getActivitiesByMember(),
+    getRankedNotifications(householdId),
+    getTodaySchedulePreview(householdId, activeMember.id),
+    getIncompleteTodos(householdId, 3),
+    getArrivalBufferRules(householdId),
+    getLinkableOptions(householdId),
+    getActivitiesByMember(householdId),
   ]);
 
-  const rightNowChore = activeMember ? await getRightNowChore(activeMember) : null;
+  const rightNowChore = await getRightNowChore(householdId, activeMember);
 
   return (
     <>

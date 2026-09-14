@@ -37,11 +37,12 @@ export const getEmailConnectionsByMember = cache(
 /** Every connection across the household, for the HoH-only read-only
  * oversight dashboard (`/settings/accounts`) — no controls live there,
  * management always happens on the owning member's own profile. */
-export const getAllEmailConnections = cache(async (): Promise<EmailConnectionSummary[]> => {
+export const getAllEmailConnections = cache(async (householdId: string): Promise<EmailConnectionSummary[]> => {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("email_connections")
     .select("*")
+    .eq("household_id", householdId)
     .order("connected_at")
     .returns<EmailConnectionRow[]>();
   if (error) throw error;

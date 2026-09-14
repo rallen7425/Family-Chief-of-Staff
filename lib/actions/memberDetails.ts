@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getMemberDetails } from "@/lib/data/memberDetails";
+import { requireHousehold } from "@/lib/actions/requireHousehold";
 import type { MemberDetail } from "@/lib/types";
 
 function revalidate() {
@@ -30,6 +31,8 @@ export async function addDetail(input: {
   arrivalBufferMinutes?: number | null;
 }): Promise<{ error?: string }> {
   if (!input.label.trim() || !input.value.trim()) return { error: "Both fields are required." };
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const category =
     input.category && ACTIVITY_CATEGORIES.includes(input.category as (typeof ACTIVITY_CATEGORIES)[number])
       ? input.category
@@ -37,6 +40,7 @@ export async function addDetail(input: {
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("member_details").insert({
     family_member_id: input.familyMemberId,
+    household_id: household.householdId,
     label: input.label.trim(),
     value: input.value.trim(),
     category,
@@ -65,8 +69,14 @@ export async function setDetailActivity(
   if (input.arrivalBufferMinutes !== undefined) {
     patch.arrival_buffer_minutes = clampBuffer(input.arrivalBufferMinutes);
   }
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("member_details").update(patch).eq("id", id);
+  const { error } = await supabase
+    .from("member_details")
+    .update(patch)
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidate();
   return {};
@@ -74,11 +84,14 @@ export async function setDetailActivity(
 
 export async function updateDetail(id: string, value: string): Promise<{ error?: string }> {
   if (!value.trim()) return { error: "Can't be blank." };
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("member_details")
     .update({ value: value.trim(), updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidate();
   return {};
@@ -87,19 +100,28 @@ export async function updateDetail(id: string, value: string): Promise<{ error?:
 /** Soft toggle — an ignored item is skipped by downstream logic but stays
  * in the list (struck through) so it can be brought back. */
 export async function toggleDetailIgnored(id: string, ignored: boolean): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
   const { error } = await supabase
     .from("member_details")
     .update({ ignored, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidate();
   return {};
 }
 
 export async function removeDetail(id: string): Promise<{ error?: string }> {
+  const household = await requireHousehold();
+  if ("error" in household) return household;
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("member_details").delete().eq("id", id);
+  const { error } = await supabase
+    .from("member_details")
+    .delete()
+    .eq("id", id)
+    .eq("household_id", household.householdId);
   if (error) return { error: error.message };
   revalidate();
   return {};
