@@ -15,6 +15,184 @@ not a convention to follow.
 
 ---
 
+## Session status (2026-09-14) — Real auth + household scoping (DEPLOYED — paused for Ben/Nora invites + Kim's invite-email test)
+
+Picked up straight from the 2026-09-12/13 Identity/Onboarding session's own "RESUME HERE" list.
+Five threads, the last one much bigger than planned — a LockScreen-summary question turned into
+retiring the fake identity system and closing the household-scoping gap outright, since the user's
+answers made clear that work couldn't be deferred any further. **Everything below is live in
+production.**
+
+### State right now
+
+| | |
+|---|---|
+| **Production** | `dpl_B5GWheaJrVSvreuV3mLehgALz48d` (READY, aliased `family-chief-of-staff.vercel.app`) — deployed from the local tree after every commit below. All routes smoke-checked: every `(app)` route 307s to `/signin` with no session (expected — see below), `/signin`/`/signup` 200, `/api/chat` 401s cleanly for an unauthenticated request. |
+| **`family-chief-of-staff`** | `main` @ `73a30ed`, pushed. Commits this session, in order: `255bccc` (pipeline retry), `f550672` (invite entry point), `02404f2` (real auth + household scoping, the big one), `73a30ed` (Phase D prep — `email_scan_log` household_id). |
+| **`rocky-coast-labs`** | `main` @ `e915796`, pushed. Migration `20260914000001_family_chief_of_staff_drop_household_id_defaults.sql` applied to the shared DB. |
+| **Checks** | `tsc` / eslint / **178 tests** / `next build` all green after every commit. |
+| **Rick's real sign-in** | Confirmed working by the user directly in production, post-deploy — the one verification I couldn't do myself. |
+
+### Thread 1 — Identity/Onboarding deploy (the 2026-09-12/13 work going live for the first time)
+
+Deployed Phases 1–5 to production for the first time (nothing had gone live yet). Hit a real bug
+immediately: `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` were added to `.env.local`
+in Phase 2 but never added to **Vercel's** production environment — every auth-dependent route
+(`/onboarding/*`, `/auth/callback`) 500'd (`getAuthUser()` throws when those vars are missing).
+Added both to Vercel production, redeployed — `/onboarding/profile` now correctly 307s to
+`/signin` instead of 500ing. Also completed the Phase 2 manual step left outstanding: user created
+the new Web-application GCP OAuth client and wired it into Supabase Auth's Google provider +
+redirect allow-list. Verified (without completing the OAuth consent myself — that's the user's
+grant to make): clicking "Sign in with Google" now reaches Google's real account picker cleanly,
+no `redirect_uri_mismatch`, correct client id and both redirect URIs. **This also unblocked real
+invite-email delivery**, tested in Thread 3.
+
+### Thread 2 — Email pipeline run #35 failure (`255bccc`, deployed)
+
+User reported a failed GitHub Actions run, later manually reran successfully. Investigated:
+`gh api .../attempts/1` showed the real failure (`curl: (22)`, HTTP 500) — GitHub's UI had
+collapsed it to "success" after the rerun. Traced to `runEmailScanPipeline()`'s only
+non-message-scoped code path: the startup `Promise.all` of four Supabase reads, with zero retry.
+Root cause inferred as a transient Supabase connectivity blip (connection's `last_error` was null,
+ruling out an auth failure; the fast ~8s failure ruled out a timeout) — not confirmed via logs,
+since Vercel's retention didn't reach back far enough. Fixed with defense in depth: a one-retry
+wrapper around the pipeline's startup reads, plus `--retry 3 --retry-all-errors` on the cron's curl
+call. Not yet re-triggered since (no further scheduled-run failures observed).
+
+### Thread 3 — Wire the missing "Invite to create login" entry point (`f550672`, deployed)
+
+Per the implementation prompt's own §7 ("one entry point, not two"): `InviteMemberModal` was only
+reachable from onboarding's `HouseholdRoster`, never from the pre-existing Manage Family page.
+Added the same button + modal to `components/family/ManageMemberClient.tsx` (`/family/[memberId]`) —
+reused verbatim, no new component. **Real finding while testing live**: clicking it against Ben
+(profile_only) rendered correctly, pre-filled, both send methods working. Clicking it against Rick
+(already `activated`) surfaced the server action's own "You need to be signed in" guard — not a bug
+in the wiring, but direct proof of Thread 5's LockScreen/real-auth disconnect: `/family/[memberId]`
+was reached via the old device-cookie model, so a browser without a real Supabase session hit the
+invite action's `getAuthUser()` check and correctly failed rather than silently working. This
+observation is what motivated actually fixing that disconnect this session instead of deferring it
+again.
+
+Once the OAuth dashboard step (Thread 1) landed, used it to send a real test invite for **Kim**
+(`activate_member`, to `fsmkma@hotmail.com`) via a throwaway script mirroring
+`inviteExistingMemberByEmail` exactly (same insert, same `admin.inviteUserByEmail` call) — the one
+piece of Phase 5 never verified: does this project's Supabase SMTP actually deliver mail. Resent
+once more later in the session (same underlying `household_invites` row `09a6cb62-…`, still pending,
+expires 2026-09-28; same `auth.users` row `9945f0be-…`). **User has not yet checked the inbox** —
+a session-only one-shot reminder was set for 2026-09-15 08:57 local (dies if the terminal session
+ends first; not durable).
+
+### Thread 4 — LockScreen re-scoped: what it actually is vs. what the user wants
+
+Asked to summarize LockScreen for the user; initial summary defended it as a legitimate
+"shared-device" design, which was wrong — the user corrected this directly. Real intended model,
+confirmed by direct Q&A: **one authenticated identity per device at a time**, no age-based
+exception (a toddler's profile is real data from day one, but *becoming* that person requires the
+same real signup as anyone), "switch account" = real sign-out then real sign-in as someone else
+(Google-chooser-style cached-account switching explicitly deferred — "mainly beneficial for
+testing," not a priority), and this should be **rolled into the household-scoping work now**, not
+staged separately. This reframing is what turned into Thread 5.
+
+### Thread 5 — Real per-account identity + household scoping (`02404f2` + `73a30ed`, the big one)
+
+Full plan at `~/.claude/plans/synchronous-napping-bird.md`. Researched via a dedicated Explore
+agent (exhaustive call-site inventory) plus direct live-DB column checks before writing the plan —
+confirmed `household_id` already existed as a real Postgres column on every relevant table (the
+2026-09-12 Phase 1 migration's own backfill), so this was purely an application-layer gap: no new
+migration needed until the final phase.
+
+- **Phase A — retire the fake identity system.** New `lib/currentMember.ts`
+  (`getCurrentMember()`, cache()d) replaces `lib/activeMember.ts`'s `getActiveMember()` at all 22
+  call sites found (pages, API routes, `lib/actions/emailConnections.ts`'s `assertOwnership`).
+  `app/(app)/layout.tsx` now redirects to `/signin` with no session — the app's one real security
+  gate, same pattern `/onboarding/profile` already used. Deleted `lib/activeMember.ts`,
+  `components/auth/LockScreen.tsx`, `MemberPicker.tsx`, `app/(app)/settings/switch/page.tsx`,
+  `setActiveMember`/`logOut`. New `signOutAction()` in `lib/actions/auth.ts` (real
+  `supabase.auth.signOut()`); `LogOutRow` calls it. Collapsed "Switch Account" + "Log out" into one
+  row per Thread 4's decision. **Free side effect**: `/api/chat` (a long-flagged fully open
+  endpoint) now requires `getCurrentMember()` too, since it needs a household id to scope its
+  queries — closes that vulnerability as a consequence, not a separate fix.
+- **Phase B — household-scoped reads.** Added `household_id` to every relevant row type in
+  `lib/data/dbTypes.ts` + two local row types (`arrivalRules.ts`, `locations.ts`). Every unscoped
+  `lib/data/*.ts` read (`familyMembers`, `events`, `todos`, `chores`, `goals`, `keepInMind`,
+  `memberDetails`, `memberEmailDomains`, `notifications`, `arrivalRules`, `locations`,
+  `emailConnections`) now takes a `householdId` param and filters by it. `lib/notifications.ts`'s
+  `getRankedNotifications()` threads it through to every source it aggregates.
+- **Phase C — household-scoped writes.** New shared `lib/actions/requireHousehold.ts` (resolves
+  the signed-in session's household, same pattern already proven in `invites.ts`/`onboarding.ts`) —
+  reused across `entries.ts`, `chores.ts` (+ `lib/chores.ts`'s `completeChore`/`claimGoal`/
+  `resolveGoalClaim`), `goals.ts`, `memberDetails.ts`, `locations.ts`, `notifications.ts`,
+  `arrivalRules.ts`, `review.ts`, `familyMembers.ts`. **Most dangerous bug found and fixed**:
+  `forgetEverything()` used to `SELECT id FROM family_members` with zero scoping — wiping every
+  household's profile fields in the entire database in one call. Now scoped to the caller's own
+  household only. `saveFamilyMember`'s old optional `householdId` passthrough field (onboarding's
+  own workaround from Phase 1) is gone — every insert now resolves its own household from the
+  session, onboarding included, since by the time it calls this the new household's own session
+  already exists. `scripts/pipeline/write.ts`/`index.ts` restructured so household-scoped data
+  (`familyMembers`/`emailDomains`/`arrivalRules`) is fetched **per-connection** (from
+  `connection.householdId`, threaded onto `EmailConnection` in `providers/types.ts`) instead of
+  once globally — necessary now that connections can genuinely belong to different households.
+- **Verified live, not just type-checked**: signed up a genuine second household through the real
+  `/signup` + onboarding UI, confirmed it saw zero of Rick's data (empty Schedule/Todo/
+  Notifications/Chores, roster showing only itself), created a real event that landed with the
+  correct new `household_id` (confirmed via direct query), confirmed Rick's household was
+  completely untouched throughout (still exactly 4 members). All test data (household, member,
+  entry, `auth.users` row) deleted afterward.
+- **Phase D — drop the column defaults** (`73a30ed` + `rocky-coast-labs` `e915796`). Before
+  writing the migration, audited every one of the 18 tables the 2026-09-12 default-migration
+  touched against the Phase C write-path list — found one real gap: the email-scan pipeline's two
+  `email_scan_log` inserts never set `household_id` (would have started throwing not-null
+  violations the moment the default dropped). Fixed and deployed first. Migration dropped the
+  `DEFAULT` on all 18 columns in one shot (per the original migration's own note: together, not
+  table-by-table). **Verified the drop actually took effect**: an insert omitting `household_id`
+  now fails with a clean `23502` not-null violation instead of silently landing in Rick's
+  household. **Verified nothing broke**: triggered a real production email-scan pipeline run
+  post-drop — `"success":true, "errors":0`, `email_scan_log` inserts succeeded correctly.
+
+### What's broken / incomplete right now
+
+- **Kim's invite email is unverified** — sent (twice) to `fsmkma@hotmail.com`, but nobody has
+  confirmed it actually arrived. This is the same "does this project's Supabase SMTP actually
+  deliver" question Phase 5 left open, now finally testable since the OAuth/redirect-allowlist
+  fix landed, but still not answered either way.
+- **Ben and Nora have no way into the app at all.** Both are still `account_status: profile_only`
+  with no `auth_user_id` — until each is invited and activates a real login, they're locked out
+  entirely now that LockScreen (which let anyone become anyone with zero credentials) is gone. This
+  is a direct, expected consequence of Thread 5, not a bug — but it's a real gap versus "the whole
+  household can use the app," not just a nice-to-have.
+- **The old Desktop-type GCP OAuth client** ("Family Chief of Staff local setup") is still sitting
+  around, fully superseded by the Web client — harmless, never cleaned up.
+- **Google-chooser-style account switching** (pick a previously-used account without retyping a
+  password) is explicitly deferred per Thread 4 — today, switching means a full sign-out + sign-in,
+  every time, for everyone. Supabase Auth only tracks one session at a time by default; building
+  the cached-multi-account behavior for real would mean deliberately storing more than one session
+  client-side, not something to reach for until it's actually wanted.
+- **Defense-in-depth gap, not a real scoping hole**: `getCompletionsForMember`/`getCompletionsSince`/
+  `getMemberPoints`/`getAllMemberPoints`/`getGoalClaimsForMember` in `lib/data/chores.ts`/`goals.ts`
+  still filter by `family_member_id` only, no `household_id` param — already unambiguous today
+  since one member belongs to exactly one household, but if that ever changes, these are the spots
+  to circle back to.
+- Everything already flagged as deferred before this session remains deferred and untouched:
+  Calendar sync (Phase 2 of the email/calendar connectors plan), Microsoft/Outlook/Hotmail,
+  the AI onboarding wizard (`OnboardingFamilyWizard`), the "Connect Gmail & Calendar" onboarding
+  card, whether to wire Distilled onto the shared identity layer.
+
+### RESUME HERE — next session should
+
+1. **Check whether Kim's invite email actually arrived** at `fsmkma@hotmail.com` (a session-only
+   reminder was set for 2026-09-15 08:57 local, but only fires if that terminal session is still
+   running — don't rely on it). If it arrived: redeem it end-to-end and confirm it links to Kim's
+   *existing* profile rather than creating a duplicate. If it never arrived: this is the real,
+   previously-unanswered "does Supabase SMTP deliver" question — worth checking spam first, then
+   the Supabase dashboard's Auth logs before assuming it's broken.
+2. **Invite Ben and Nora** the same way, once Kim's flow is confirmed clean.
+3. Lower priority, whenever it comes up: delete the dormant Desktop-type GCP OAuth client; consider
+   whether the chore/goal member-scoped-only functions above are worth hardening to household_id
+   too; decide whether Google-chooser-style account switching is ever actually wanted before
+   building it.
+
+---
+
 ## Session status (2026-09-12/13) — Identity, Sign-In & Onboarding: Phases 1–5 — IN PROGRESS, stopped for review
 
 Working from `identity-signin-onboarding-implementation-prompt.md` (+ `identity-signin-onboarding-plan.md`,
